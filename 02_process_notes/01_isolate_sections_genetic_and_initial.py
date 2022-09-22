@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 from datetime import datetime
 
-dn = '/share/fsmresfiles/breast_cancer_pregnancy/data/notes'
+dn = '/share/fsmresfiles/breast_cancer_pregnancy/data'
 
 with open(os.path.join(dn, 'column_names_note_type_detail.txt'), 'r') as f:
     lines = f.readlines()
@@ -21,7 +21,7 @@ for line in lines:
 
 ## Read in SQL query results
 struc = pd.read_csv(
-    os.path.join(dn, 'genetic_counsel/sql_query_results_notes_genetic_counsel.csv'), 
+    os.path.join(dn, 'genetic/sql_query_results_notes_genetic_counsel.csv'), 
     header=None, names=colnames
 )
 
@@ -62,7 +62,7 @@ separated_sections.to_csv(os.path.join(dn, 'genetic_counsel/isolated_sections_ge
 
 ## Read in SQL query results
 struc = pd.read_csv(
-    os.path.join(dn, 'initial_counsel/sql_query_results_notes_initial_counsel.csv'),
+    os.path.join(dn, 'initialcounsel/sql_query_results_notes_initial_counsel.csv'),
     header=None, names=colnames
 )
 

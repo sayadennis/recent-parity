@@ -1,0 +1,219 @@
+description of each column of the the tables	
+	
+cohort.csv	
+columns	description
+diagnosis_cr_id	"diagnosis ID in Complete Records  ,  uniquely identify a diagnosis"
+patient_ir_id	"patient ID in Integrated Records  ,  uniquely identify a patient"
+encounter_ir_id	"encounter ID in Integrated Records  ,  uniquely identify an encounter"
+src_encounter_id	encounter ID in source systems (EPIC or Cerner)
+src_diagnosis_id	diagnosis ID in source systems (EPIC or Cerner)
+diagnosis	the diagnosis
+vocabulary_value	the ICD9 code of the diagnosis
+diagnosis_dts	the date and time to make the diagnosis
+label	the source system
+description	the description of source system
+source_system_mrd_id	the ID of source system in Master Reference Data
+	
+	
+encounter	
+columns	description
+patient_ir_id	"patient ID in Integrated Records  ,  uniquely identify a patient"
+encounter_ir_id	"encounter ID in Integrated Records  ,  uniquely identify a patient"
+encounter_source_system_mrd_id	the ID of source system in Master Reference Data
+src_encounter_id	encounter ID in source systems (EPIC or Cerner)
+src_label	the source system
+src_description	the description of source system
+disease_identified	the diagnosis made for the encounter
+disease_identified_icd9	the diagnosed ICD9 for the encounter
+encounter_start_date	start date of the encounter
+encounter_end_date	end date of the encounter
+loc_unit_dept	hospital department of the encounter
+	
+	
+commobilities	
+columns	description
+diagnosis_cr_id	"diagnosis ID in Complete Records  ,  uniquely identify a diagnosis"
+patient_ir_id	"patient ID in Integrated Records  ,  uniquely identify a patient"
+encounter_ir_id	"encounter ID in Integrated Records  ,  uniquely identify an encounter"
+src_encounter_id	encounter ID in source systems (EPIC or Cerner)
+src_diagnosis_id	diagnosis ID in source systems (EPIC or Cerner)
+diagnosis	the diagnosis
+vocabulary_value	the ICD9 code of the diagnosis
+diagnosis_dts	the date and time to make the diagnosis
+label	the source system
+description	the description of source system
+source_system_mrd_id	the ID of source system in Master Reference Data
+commo_icd9_code	the ICD9 code of the comobidity
+commo_diagnosis	the diagnosis of the comobidity
+	
+	
+Labs	
+columns	description
+src_encounter_id	encounter ID in source systems (EPIC or Cerner)
+src_label	the source system
+src_description	the description of source system
+source_system_mrd_id	the ID of source system in Master Reference Data
+lab_result_cr_id	the lab result id in Complete Records
+encounter_ir_id	"encounter ID in Integrated Records  ,  uniquely identify an encounter"
+src_database_nm	source database name
+src_schema_nm	source schema name
+src_object_nm	source object name
+src_column_nm	source column name
+src_column_value	source column value
+src_order_id	source order id
+src_accession_nbr	source accession
+src_lab_result_id	the lab result id in source system
+result_type	the lab type
+result_type_nm	the lab name
+vocabulary_value	
+result_dts	the date and time of the lab result
+result_val	the value of the lab result
+result_unit	the unit of the lab result
+result_reference_low	the reference lower bound of the lab result
+result_reference_high	the reference upper bound of the lab result
+result_status	result status
+result_seq	
+result_normalcy	
+vocabulary_mrd_id	
+end_effective_dts	
+active_ind	
+	
+prescription	
+columns	description
+patient_ir_id	"patient ID in Integrated Records  ,  uniquely identify a patient"
+src_encounter_id	encounter ID in source systems (EPIC or Cerner)
+src_label	the source system
+src_description	the description of source system
+src_database_nm	source database name
+src_schema_nm	source schema name
+src_object_nm	source object name
+src_column_nm	source column name
+src_column_value	source column value
+src_med_order_id	source prescription order ID
+med_id	prescription ID in Integrated Records
+medication	
+medication_nm	medication name
+generic_medication_nm	generic medication name
+start_dts	medication start date
+stop_dts	medication stop date
+order_status	order status
+volume	
+strength	
+form	
+rxroute	
+quantity	
+refills	
+vocabulary_mrd_id	
+vocabulary_value	
+data_src	prescription
+	
+	
+home_med	
+columns	description
+patient_ir_id	"patient ID in Integrated Records  ,  uniquely identify a patient"
+src_encounter_id	encounter ID in source systems (EPIC or Cerner)
+src_label	the source system
+src_description	the description of source system
+src_database_nm	source database name
+src_schema_nm	source schema name
+src_object_nm	source object name
+src_column_nm	source column name
+src_column_value	source column value
+src_med_order_id	source home medication order ID
+med_id	home medication ID in Integrated Records
+medication	
+medication_nm	medication name
+generic_medication_nm	generic medication name
+start_dts	medication start date
+stop_dts	medication stop date
+order_status	order status
+volume	
+strength	
+form	
+rxroute	
+quantity	
+refills	
+vocabulary_mrd_id	
+vocabulary_value	
+data_src	homemeds
+	
+	
+mar_med	
+columns	description
+patient_ir_id	"patient ID in Integrated Records  ,  uniquely identify a patient"
+src_encounter_id	encounter ID in source systems (EPIC or Cerner)
+src_label	the source system
+src_description	the description of source system
+src_database_nm	source database name
+src_schema_nm	source schema name
+src_object_nm	source object name
+src_column_nm	source column name
+src_column_value	source column value
+src_encounter_id	encounter ID in source systems (EPIC or Cerner)
+encounter_ir_id	"encounter ID in Integrated Records  ,  uniquely identify an encounter"
+src_order_id	source order ID
+order_description	source order descrption
+medication	
+medication_nm	medication name
+iv_ind	
+start_dts	medication start date
+stop_dts	medication stop date
+dose	dose
+dose_unit	dose unit
+dose_unit_mrd_id	dose unit id in Master Reference Data
+route_dsc	route description
+route_mrd_id	route ID in Master Reference Data
+site_dsc	medication site
+admin_site_mrd_id	adminisatration site ID in Master Reference Data
+vocabulary_value	
+vocabulary_mrd_id	
+data_src	mar
+	
+	
+	
+admin_with_Zip_financial.csv	
+columns	description
+patient_ir_id	"patient ID in Integrated Records  ,  uniquely identify a patient"
+mrd_pt_id	"patient ID in Master Reference Data,  uniquely identify a patient"
+race_nm	race of the patient
+ethncty_nm	ethnicity of the patient
+mrtl_status_nm	Marital status
+gender_nm	gender (Male or Female)
+birth_dt_tm	birth data and time
+fncl_class_nm	finacial class
+zip_cd_txt	zip code
+pt_status_txt	patient current status
+death_dts_epic	death date of patients from epic system
+deceased_cd_cerner	the deseased code of patient from cerner system
+deceased_dt_tm_cerner	the deseased time of patient from cerner system
+	
+	
+additional_death_from_SSN.csv	
+columns	description
+mrd_pt_id	"patient ID in Master Reference Data,  uniquely identify a patient"
+ssn_txt	SSN
+death_dts	death date
+	
+	
+BMI.csv	
+columns	description
+mrd_pt_id	"patient ID in Master Reference Data,  uniquely identify a patient"
+encntr_id	encounter id
+bmi_val	BMI value
+bmi_dts	BMI date
+	
+	
+height.csv	
+columns	description
+mrd_pt_id	"patient ID in Master Reference Data,  uniquely identify a patient"
+encntr_id	encounter id
+height_val	height value
+bmi_dts	height date
+	
+	
+weight.csv	
+columns	description
+mrd_pt_id	"patient ID in Master Reference Data,  uniquely identify a patient"
+encntr_id	encounter id
+weight_val	weight value
+bmi_dts	weight date
