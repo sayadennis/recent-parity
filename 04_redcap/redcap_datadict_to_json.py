@@ -1,8 +1,9 @@
 import numpy as np
 import pandas as pd
-import json
+import pickle
 
-dn = '/share/fsmresfiles/breast_cancer_pregnancy/'
+dn = '/share/fsmresfiles/breast_cancer_pregnancy/data/06_exported_from_redcap'
+
 datadict_fn = 'FrequencyAndResultsOfGeneticTe_DataDictionary_2022-09-26.csv'
 
 datadict_df = pd.read_csv(f'{dn}/{datadict_fn}')
@@ -19,16 +20,5 @@ for key in dd.keys(): # key is the column nane
         choices = {int(items[0]): items[1] for items in choices} # element like {1: "Pathogenic"} 
         dd[key]['Choices, Calculations, OR Slider Labels'] = choices
 
-####################################
-#### Tables for Andrea's report ####
-####################################
-
-## Items to include (note)
-# Demographics tables - like you mentioned, age 
-# Parity distribution - independent variable, so separating into those 4 categories 
-# NAC regimen distribution
-# Common mutations
-# Biomarker stages - three groups (ER/PR+ HER2-; triple negative (no hormone receptor no HER2); and HER2+) distribution
-
-
-
+with open(f'{dn}/data_dictionary.p', 'wb') as f:
+    pickle.dump(dd, f)
