@@ -7,7 +7,7 @@ dn = '/share/fsmresfiles/breast_cancer_pregnancy'
 ## Load data & data dictionary
 
 datadir = 'data/06_exported_from_redcap'
-fn = 'FrequencyAndResultsO_DATA_2022-10-07_1311.csv'
+fn = 'FrequencyAndResultsO_DATA_2022-10-07_1648.csv'
 data = pd.read_csv(f'{dn}/{datadir}/{fn}')
 
 with open(f'{dn}/{datadir}/data_dictionary.p', 'rb') as f:

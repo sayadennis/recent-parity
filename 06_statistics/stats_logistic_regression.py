@@ -14,9 +14,9 @@ dn = '/share/fsmresfiles/breast_cancer_pregnancy/data/06_exported_from_redcap'
 
 data = pd.read_csv(f'{dn}/FrequencyAndResultsO_DATA_2022-09-26_1703.csv')
 
-######################################
-#### Logistic regression analysis ####
-######################################
+###################################
+#### Define analysis functions ####
+###################################
 
 genes=['any_patho_mutation', 'brca1', 'brca2', 'palb2', 'tp53', 'chek2', 'pten', 'cdh1', 'stk11', 'atm']
 
@@ -69,9 +69,9 @@ def get_oddsratio_ci(X, y, alpha=0.95, rep=5000):
     return oddsratio, ci
 
 
-######################
-#### Perform test ####
-######################
+##########################
+#### Perform Analysis ####
+##########################
 
 for gene in genes:
     print(f'######## Results for {gene} ########')

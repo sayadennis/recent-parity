@@ -4,7 +4,7 @@ import pickle
 
 dn = '/share/fsmresfiles/breast_cancer_pregnancy/data/06_exported_from_redcap'
 
-datadict_fn = 'FrequencyAndResultsOfGeneticTe_DataDictionary_2022-09-26.csv'
+datadict_fn = 'FrequencyAndResultsOfGeneticTe_DataDictionary_2022-10-07.csv'
 
 datadict_df = pd.read_csv(f'{dn}/{datadict_fn}')
 datadict_df = datadict_df.set_index('Variable / Field Name')
