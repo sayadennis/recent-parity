@@ -6,13 +6,13 @@ from datetime import datetime
 from sklearn.utils import resample
 from sklearn.linear_model import LogisticRegression
 
-dn = '/share/fsmresfiles/breast_cancer_pregnancy/data'
+dn = '/share/fsmresfiles/breast_cancer_pregnancy/data/06_exported_from_redcap'
 
 #######################################
 #### Read and lightly process data ####
 #######################################
 
-data = pd.read_csv(f'{dn}/20220616_redcap_import_data.csv')
+data = pd.read_csv(f'{dn}/FrequencyAndResultsO_DATA_2022-09-26_1703.csv')
 
 ######################################
 #### Logistic regression analysis ####
