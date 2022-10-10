@@ -5,9 +5,8 @@ import pickle
 dn = '/share/fsmresfiles/breast_cancer_pregnancy'
 
 ## Load data & data dictionary
-
 datadir = 'data/06_exported_from_redcap'
-fn = 'FrequencyAndResultsO_DATA_2022-10-07_1648.csv'
+fn = 'FrequencyAndResultsO_DATA_2022-10-10_0938.csv'
 data = pd.read_csv(f'{dn}/{datadir}/{fn}')
 
 with open(f'{dn}/{datadir}/data_dictionary.p', 'rb') as f:
@@ -16,7 +15,7 @@ with open(f'{dn}/{datadir}/data_dictionary.p', 'rb') as f:
 # Select only patients with neoadjuvant therapy if necessary
 sumtabdir = 'summary_tables'
 
-nat_only = False
+nat_only = True
 
 if nat_only:
     data = data.iloc[data.nat.values==1,]
@@ -139,6 +138,25 @@ for biomarker in ['er', 'pr', 'her2']:
         dd[f'{biomarker}_status']['Choices, Calculations, OR Slider Labels']
     )=='Positive').values
 
+data['biomarker_subtypes'] = None
+for i in data.index:
+    try:
+        er = dd['er_status']['Choices, Calculations, OR Slider Labels'][data.loc[i,'er_status']]=='Positive'
+        pr = dd['pr_status']['Choices, Calculations, OR Slider Labels'][data.loc[i,'pr_status']]=='Positive'
+    except:
+        er = False
+        pr = False
+        print('Missing ER/PR at index:', i)
+    her2 = dd['her2_status']['Choices, Calculations, OR Slider Labels'][data.loc[i,'her2_status']]=='Positive'
+    if ((er | pr) & (not her2)):
+        data.loc[i,'biomarker_subtypes'] = 'ER/PR+ HER2-'
+    elif ((not er) & (not pr) & (not her2)):
+        data.loc[i,'biomarker_subtypes'] = 'Triple Negative'
+    elif her2:
+        data.loc[i,'biomarker_subtypes'] = 'HER2+'
+    else:
+        print('Unknown pattern at index:', i)
+
 df = pd.DataFrame(
     [np.sum(status['er'] & status['pr'] & ~status['her2']),
      np.sum(~status['er'] & ~status['pr'] & ~status['her2']),
@@ -163,3 +181,69 @@ for key in dd.keys():
                 print(df)
                 print('')
                 df.to_csv(f'{dn}/{sumtabdir}/{key}.csv')
+
+
+if nat_only:
+    # Andrea's table: tumor characteristics separated by parity information 
+    data['parity_category'] = None
+    for i in data.index:
+        if data.loc[i,'parous']==0:
+            data.loc[i,'parity_category'] = 'Nulliparous'
+        elif data.loc[i,'years_since_pregnancy']<5:
+            data.loc[i,'parity_category'] = '<5 years'
+        elif data.loc[i,'years_since_pregnancy']<10:
+            data.loc[i,'parity_category'] = '5-10 years'
+        else:
+            data.loc[i,'parity_category'] = '>=10 years'
+
+    #### Clinical T staging category ####
+    show_tab = pd.crosstab(data.clin_tumor_stag_cat, data.parity_category).rename(
+        dd['clin_tumor_stag_cat']['Choices, Calculations, OR Slider Labels'],
+        axis=0
+    )
+    show_tab.loc[
+        :,['Nulliparous', '<5 years', '5-10 years', '>=10 years']
+    ].to_csv(f'{dn}/{sumtabdir}/counts_clintumor_vs_parity.csv')
+
+    #### Clinical N staging category ####
+    show_tab = pd.crosstab(data.clin_node_stag_cat, data.parity_category).rename(
+        dd['clin_node_stag_cat']['Choices, Calculations, OR Slider Labels'],
+        axis=0
+    )
+    show_tab.loc[
+        :,['Nulliparous', '<5 years', '5-10 years', '>=10 years'],
+    ].to_csv(f'{dn}/{sumtabdir}/counts_clinnode_vs_parity.csv')
+
+    #### Biomarker subtypes ####
+    show_tab = pd.crosstab(data.biomarker_subtypes, data.parity_category)
+    show_tab.loc[
+        :,['Nulliparous', '<5 years', '5-10 years', '>=10 years']
+    ].to_csv(f'{dn}/{sumtabdir}/counts_biomarkersubtype_vs_parity.csv')
+
+    #### Treatment regimen ####
+    show_tab = pd.crosstab(
+        data.nat_reg.map(dd['nat_reg']['Choices, Calculations, OR Slider Labels']), 
+        data.parity_category
+    )
+    show_tab.loc[
+        :,['Nulliparous', '<5 years', '5-10 years', '>=10 years']
+    ].to_csv(f'{dn}/{sumtabdir}/counts_natregimen_vs_parity.csv')
+
+    #### Genetic status - do all genes ####
+    show_tab = pd.DataFrame(columns=['Nulliparous', '<5 years', '5-10 years', '>=10 years'])
+    for gene in ['brca1', 'brca2', 'palb2', 'tp53', 'chek2', 'pten', 'cdh1', 'stk11', 'atm']:
+        try:
+            show_tab = pd.concat((
+                show_tab, 
+                pd.DataFrame(pd.crosstab(
+                    data[gene].map(dd[gene]['Choices, Calculations, OR Slider Labels']), 
+                    data.parity_category
+                ).loc['Pathogenic',:].rename(gene)).transpose()
+            ))
+        except:
+            print('No mutations in ', gene)
+            show_tab.loc[gene,:] = 0
+
+    show_tab.loc[
+        :,['Nulliparous', '<5 years', '5-10 years', '>=10 years']
+    ].to_csv(f'{dn}/{sumtabdir}/counts_genetic_vs_parity.csv')
