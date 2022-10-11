@@ -1,10 +1,11 @@
 import os
 import sys
+import re
 import pickle
 import numpy as np
 import pandas as pd
 from datetime import datetime
-from scipy.stats import chisquare
+from scipy.stats import chisquare, ttest_ind
 from sklearn.utils import resample
 from sklearn.linear_model import LogisticRegression
 
@@ -22,6 +23,8 @@ data = data.iloc[data.nat.values==1,]
 
 with open(f'{dn}/{datadir}/data_dictionary.p', 'rb') as f:
     dd = pickle.load(f)
+
+outdir = 'stat_results/nac_only'
 
 ## Fill in parity category 
 data['parity_category'] = None
@@ -73,30 +76,11 @@ for i in data.index:
 #### Define functions ####
 ##########################
 
-# def generate_lrdata(df, feature=[], confounder=[], target=[], recency_thres=10):
-#     lrdata = pd.DataFrame(None, index=None, columns=['parous', 'has_mutation', 'recent', 'age'])
-#     for i in range(df.shape[0]):
-#         pat_dict = {}
-#         pat_dict['parous'] = [df['parous'].iloc[i]] # binary 0/1
-#         pat_dict['recent'] = [int(df['years_since_pregnancy'].iloc[i] < recency_thres)]
-#         pat_dict['ER/PR'] = [(df['er_status'].iloc[i]==1 | df['pr_status'].iloc[i]==1)]
-#         pat_dict['target'] = [(df['rcb_category'].iloc[i]==1 | df['rcb_category'].iloc[i]==2)]
-#         lrdata = pd.concat((lrdata, pd.DataFrame(pat_dict)), ignore_index=True)
-#     # data for nulliparous vs. parous 
-#     X_np = np.array(lrdata[['parous', 'age']], dtype=float)
-#     X_np[:,1] = (X_np[:,1] - np.mean(X_np[:,1]))/np.std(X_np[:,1]) # standard scale
-#     y_np = np.array(lrdata['has_mutation'], dtype=float)
-#     # data for recency of parity --only select women who are parous
-#     X_rec = np.array(lrdata.iloc[lrdata['parous'].values==1][['recent', 'age']], dtype=float)
-#     X_rec[:,1] = (X_rec[:,1] - np.mean(X_rec[:,1]))/np.std(X_rec[:,1]) # standard scale
-#     y_rec = np.array(lrdata.iloc[lrdata['parous'].values==1]['has_mutation'], dtype=float)
-#     return X_np, y_np, X_rec, y_rec
-
 def get_oddsratio_ci(X, y, alpha=0.95, rep=5000):
     oddsratio = {}
     for colnum in range(X.shape[1]):
         oddsratio[colnum] = []
-    i = 0
+    # 
     for i in range(rep):
         X_bs, y_bs = resample(X, y, random_state=i) # create bootstrap (bs) sample
         if ~np.all(y_bs==0):
@@ -106,7 +90,7 @@ def get_oddsratio_ci(X, y, alpha=0.95, rep=5000):
                 oddsratio[colnum].append(np.exp(lrm.coef_[0][colnum]))
         else:
             continue
-    oddsratio = [np.mean(oddsratio[colnum]) for colnum in range(X.shape[1])]
+    mean_or = [np.mean(oddsratio[colnum]) for colnum in range(X.shape[1])]
     ci = []
     for colnum in range(X.shape[1]):
         # first get ci1
@@ -115,7 +99,7 @@ def get_oddsratio_ci(X, y, alpha=0.95, rep=5000):
         p = (alpha+((1.0-alpha)/2.0)) * 100
         upper = np.percentile(oddsratio[colnum], p)
         ci.append((lower, upper))
-    return oddsratio, ci
+    return mean_or, ci
 
 ##########################################################
 #### Stratified analysis 1 - three biomarker subtypes ####
@@ -123,7 +107,6 @@ def get_oddsratio_ci(X, y, alpha=0.95, rep=5000):
 
 #### A. Chi-squared/Fisher's exact test ####
 for bm_cat in ['ER/PR+ HER2-', 'Triple Negative', 'HER2+']:
-    print(f'#### {bm_cat} ####')
     crosstab = pd.crosstab(
         data.iloc[data.biomarker_subtypes.values==bm_cat,:].rcb_category.map(dd['rcb_category']['Choices, Calculations, OR Slider Labels']),
         data.iloc[data.biomarker_subtypes.values==bm_cat,:].parity_category
@@ -133,16 +116,21 @@ for bm_cat in ['ER/PR+ HER2-', 'Triple Negative', 'HER2+']:
         pd.DataFrame(crosstab.loc[['2','3']].sum(axis=0), columns=['Negative']).transpose()
     ))
     stattab.columns.name = None # remove column label for clarity 
+    fn_bm_cat = re.sub(r"\s|[^A-Za-z]+", "_", bm_cat).lower()
     pd.DataFrame(
         np.array([chisquare(stattab).statistic, chisquare(stattab).pvalue]), 
         index=['chi-stat', 'p'], 
         columns=stattab.columns
-    )
-    print('\n\n')
+    ).to_csv(f'{dn}/{outdir}/chi_test_biomarksub_{fn_bm_cat}.csv')
 
 #### B. Odds-ratio and confidence intervals calculated via logistic regression ####
+record_ors = pd.DataFrame(
+    None, 
+    index=['<5 years', '5-10 years', '>=10 years'],
+    columns=['ER/PR+ HER2-', 'Triple Negative', 'HER2+']
+)
+
 for bm_cat in ['ER/PR+ HER2-', 'Triple Negative', 'HER2+']:
-    print(f'#### {bm_cat} ####')
     sub_data = data.iloc[data.biomarker_subtypes.values==bm_cat,:]
     for par_query in ['<5 years', '5-10 years', '>=10 years']: # parity query category 
         X = sub_data.iloc[
@@ -157,7 +145,28 @@ for bm_cat in ['ER/PR+ HER2-', 'Triple Negative', 'HER2+']:
         ).fillna(0).to_numpy()
         # perform LR analysis 
         or_mean, ci = get_oddsratio_ci(X, y)
+        record_ors.loc[par_query, bm_cat] = f'{or_mean[0]:.4f} (95% CI {ci[0][0]:.4f}-{ci[0][1]:.4f})'
 
+record_ors.to_csv(f'{dn}/{outdir}/logistic_oddsratio_biomarkercategory.csv', index=True)
+
+#### C. Student's t-test with continuous RCB ####
+record_t = pd.DataFrame(
+    None, 
+    index=['<5 years', '5-10 years', '>=10 years'],
+    columns=['ER/PR+ HER2-', 'Triple Negative', 'HER2+']
+)
+
+for bm_cat in ['ER/PR+ HER2-', 'Triple Negative', 'HER2+']:
+    sub_data = data.iloc[data.biomarker_subtypes.values==bm_cat,:]
+    for par_query in ['<5 years', '5-10 years', '>=10 years']: # parity query category 
+        ref_dist = sub_data.iloc[sub_data.parity_category.values=='Nulliparous',:].rcb.values
+        alt_dist = sub_data.iloc[sub_data.parity_category.values==par_query,:].rcb.values
+        t_result = ttest_ind(alt_dist, ref_dist, nan_policy='omit')
+        t = t_result.statistic
+        p = t_result.pvalue
+        record_t.loc[par_query, bm_cat] = f'{t:.4f} (p={p:.4f})'
+
+record_t.to_csv(f'{dn}/{outdir}/ttest_biomarkercategory.csv', index=True)
 
 #########################################################
 #### Stratified analysis 2 - ER/PR positive vs. rest ####
@@ -165,7 +174,6 @@ for bm_cat in ['ER/PR+ HER2-', 'Triple Negative', 'HER2+']:
 
 #### A. Chi-squared/Fisher's exact test ####
 for erpr_cat in ['ER/PR+', 'ER/PR-']:
-    print(f'#### {erpr_cat} ####')
     crosstab = pd.crosstab(
         data.iloc[data.er_pr.values==erpr_cat,:].rcb_category.map(dd['rcb_category']['Choices, Calculations, OR Slider Labels']),
         data.iloc[data.er_pr.values==erpr_cat,:].parity_category
@@ -175,14 +183,60 @@ for erpr_cat in ['ER/PR+', 'ER/PR-']:
         pd.DataFrame(crosstab.loc[['2','3']].sum(axis=0), columns=['Negative']).transpose()
     ))
     stattab.columns.name = None # remove column label for clarity 
+    if '+' in erpr_cat:
+        fn_bm_cat = 'pos'
+    elif '-' in erpr_cat:
+        fn_bm_cat = 'neg'
     pd.DataFrame(
         np.array([chisquare(stattab).statistic, chisquare(stattab).pvalue]), 
         index=['chi-stat', 'p'], 
         columns=stattab.columns
-    )
-    print('\n\n')
+    ).to_csv(f'{dn}/{outdir}/chi_test_erpr_{fn_bm_cat}.csv')
 
 #### B. Odds-ratio and confidence intervals calculated via logistic regression ####
+record_ors = pd.DataFrame(
+    None, 
+    index=['<5 years', '5-10 years', '>=10 years'],
+    columns=['ER/PR+', 'ER/PR-']
+)
+
+for erpr_cat in ['ER/PR+', 'ER/PR-']:
+    sub_data = data.iloc[data.er_pr.values==erpr_cat,:]
+    for par_query in ['<5 years', '5-10 years', '>=10 years']: # parity query category 
+        X = sub_data.iloc[
+            ((sub_data.parity_category.values=='Nulliparous') | (sub_data.parity_category.values==par_query))
+        ].parity_category.map(
+            {'Nulliparous' : 0, par_query : 1}
+        ).to_numpy().reshape(-1,1)
+        y = sub_data.iloc[
+            ((sub_data.parity_category.values=='Nulliparous') | (sub_data.parity_category.values==par_query))
+        ].rcb_category.map(dd['rcb_category']['Choices, Calculations, OR Slider Labels']).map(
+            {'0' : 1, '1' : 1, '2' : 0, '3' : 0}
+        ).fillna(0).to_numpy()
+        # perform LR analysis 
+        or_mean, ci = get_oddsratio_ci(X, y)
+        record_ors.loc[par_query, erpr_cat] = f'{or_mean[0]:.4f} (95% CI {ci[0][0]:.4f}-{ci[0][1]:.4f})'
+
+record_ors.to_csv(f'{dn}/{outdir}/logistic_oddsratio_erpr_category.csv', index=True)
+
+#### C. Student's t-test with continuous RCB ####
+record_t = pd.DataFrame(
+    None, 
+    index=['<5 years', '5-10 years', '>=10 years'],
+    columns=['ER/PR+', 'ER/PR-']
+)
+
+for erpr_cat in ['ER/PR+', 'ER/PR-']:
+    sub_data = data.iloc[data.er_pr.values==erpr_cat,:]
+    for par_query in ['<5 years', '5-10 years', '>=10 years']: # parity query category 
+        ref_dist = sub_data.iloc[sub_data.parity_category.values=='Nulliparous',:].rcb.values
+        alt_dist = sub_data.iloc[sub_data.parity_category.values==par_query,:].rcb.values
+        t_result = ttest_ind(alt_dist, ref_dist, nan_policy='omit')
+        t = t_result.statistic
+        p = t_result.pvalue
+        record_t.loc[par_query, erpr_cat] = f'{t:.4f} (p={p:.4f})'
+
+record_t.to_csv(f'{dn}/{outdir}/ttest_erpr_category.csv', index=True)
 
 # #####################################
 # #### Overall logistic regression ####
@@ -202,5 +256,3 @@ for erpr_cat in ['ER/PR+', 'ER/PR-']:
 # #### A. with three biological subtypes ####
 
 # #### B. with ER/PR positive vs. rest ####
-
-

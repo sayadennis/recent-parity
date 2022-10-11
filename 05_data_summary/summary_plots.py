@@ -45,11 +45,26 @@ plt.savefig(f'{dn}/{plotdir}/age_at_diagnosis.png')
 #### For Andrea's presentation ####
 ###################################
 
+# Andrea's table: tumor characteristics separated by parity information 
+data['parity_category'] = None
+for i in data.index:
+    if data.loc[i,'parous']==0:
+        data.loc[i,'parity_category'] = 'Nulliparous'
+    elif data.loc[i,'years_since_pregnancy']<5:
+        data.loc[i,'parity_category'] = '<5 years'
+    elif data.loc[i,'years_since_pregnancy']<10:
+        data.loc[i,'parity_category'] = '5-10 years'
+    else:
+        data.loc[i,'parity_category'] = '>=10 years'
+
 ## Scatter plot: clinical vs pathological tumor size 
 fig, ax = plt.subplots(figsize=(4,4))
-ax.scatter(data.clin_tumor_size, data.tumor_size)
+for par_cat in data.parity_category.unique():
+    par_data = data.iloc[data.parity_category.values==par_cat,:]
+    ax.scatter(par_data.clin_tumor_size, par_data.tumor_size, label=par_cat, alpha=0.5) # .map(colors)
 ax.set_xlabel('Clinical size (cm)')
 ax.set_ylabel('Pathological size (cm)')
+ax.legend()
 fig.savefig(f'{dn}/{plotdir}/clin_path_size_scatter.png')
 plt.close()
 
