@@ -196,6 +196,32 @@ if nat_only:
         else:
             data.loc[i,'parity_category'] = '>=10 years'
 
+    data['er_pr'] = None
+    for i in data.index:
+        try:
+            er = dd['er_status']['Choices, Calculations, OR Slider Labels'][data.loc[i,'er_status']]=='Positive'
+            pr = dd['pr_status']['Choices, Calculations, OR Slider Labels'][data.loc[i,'pr_status']]=='Positive'
+        except:
+            er = False
+            pr = False
+            print('Missing ER/PR at index:', i)
+        if (er | pr):
+            data.loc[i,'er_pr'] = 'ER/PR+'
+        else:
+            data.loc[i,'er_pr'] = 'ER/PR-'
+
+    #### Age ####
+    show_tab = pd.DataFrame(
+        index=['Mean age (±SD)'],
+        columns=['Nulliparous', '<5 years', '5-10 years', '>=10 years']
+    )
+    for par_cat in show_tab.columns:
+        mean = data.iloc[data.parity_category.values==par_cat,:].age_at_diagnosis.mean()
+        std = data.iloc[data.parity_category.values==par_cat,:].age_at_diagnosis.std()
+        show_tab.loc['Mean age (±SD)',par_cat] = f'{mean:.2f} (±{std:.2f})'
+    # 
+    show_tab.to_csv(f'{dn}/{sumtabdir}/demo_age_vs_parity.csv')
+
     #### Clinical T staging category ####
     show_tab = pd.crosstab(data.clin_tumor_stag_cat, data.parity_category).rename(
         dd['clin_tumor_stag_cat']['Choices, Calculations, OR Slider Labels'],
@@ -228,6 +254,25 @@ if nat_only:
     show_tab.loc[
         :,['Nulliparous', '<5 years', '5-10 years', '>=10 years']
     ].to_csv(f'{dn}/{sumtabdir}/counts_natregimen_vs_parity.csv')
+
+    #### RCB ####
+    show_tab = pd.crosstab(
+        data.rcb_category.map(dd['rcb_category']['Choices, Calculations, OR Slider Labels']), 
+        data.parity_category
+    )
+    show_tab.loc[
+        :,['Nulliparous', '<5 years', '5-10 years', '>=10 years']
+    ].to_csv(f'{dn}/{sumtabdir}/counts_rcbcategory_vs_parity.csv')
+
+    #### RCB and ER/PR status ####
+    show_tab = pd.DataFrame(data.groupby(['er_pr', 'rcb_category', 'parity_category']).size(), columns=['count'])
+    show_tab = show_tab.reset_index(level='parity_category').pivot(columns='parity_category')
+    # clean up column names 
+    levels = show_tab.columns.levels
+    labels = show_tab.columns.labels
+    show_tab.columns = levels[1][labels[1]]
+    show_tab.columns.name = None
+    show_tab.to_csv(f'{dn}/{sumtabdir}/counts_rcbcategory_vs_erpr_vs_parity.csv')
 
     #### Genetic status - do all genes ####
     show_tab = pd.DataFrame(columns=['Nulliparous', '<5 years', '5-10 years', '>=10 years'])

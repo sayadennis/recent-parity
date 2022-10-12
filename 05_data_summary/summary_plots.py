@@ -58,7 +58,7 @@ for i in data.index:
         data.loc[i,'parity_category'] = '>=10 years'
 
 ## Scatter plot: clinical vs pathological tumor size 
-fig, ax = plt.subplots(figsize=(4,4))
+fig, ax = plt.subplots(figsize=(8,8))
 for par_cat in data.parity_category.unique():
     par_data = data.iloc[data.parity_category.values==par_cat,:]
     ax.scatter(par_data.clin_tumor_size, par_data.tumor_size, label=par_cat, alpha=0.5) # .map(colors)

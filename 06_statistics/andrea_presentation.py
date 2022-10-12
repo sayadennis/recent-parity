@@ -173,6 +173,12 @@ record_t.to_csv(f'{dn}/{outdir}/ttest_biomarkercategory.csv', index=True)
 #########################################################
 
 #### A. Chi-squared/Fisher's exact test ####
+record_chi = pd.DataFrame(
+    None, 
+    index=['<5 years', '5-10 years', '>=10 years'],
+    columns=['ER/PR+', 'ER/PR-']
+)
+
 for erpr_cat in ['ER/PR+', 'ER/PR-']:
     crosstab = pd.crosstab(
         data.iloc[data.er_pr.values==erpr_cat,:].rcb_category.map(dd['rcb_category']['Choices, Calculations, OR Slider Labels']),
@@ -187,11 +193,14 @@ for erpr_cat in ['ER/PR+', 'ER/PR-']:
         fn_bm_cat = 'pos'
     elif '-' in erpr_cat:
         fn_bm_cat = 'neg'
-    pd.DataFrame(
-        np.array([chisquare(stattab).statistic, chisquare(stattab).pvalue]), 
-        index=['chi-stat', 'p'], 
-        columns=stattab.columns
-    ).to_csv(f'{dn}/{outdir}/chi_test_erpr_{fn_bm_cat}.csv')
+    #
+    for par_query in ['<5 years', '5-10 years', '>=10 years']:
+        f_obs = stattab.loc[:,['Nulliparous', par_query]]
+        f_exp = np.array([f_obs.sum(axis=0)/2, f_obs.sum(axis=0)/2])
+        chi, p = chisquare(f_obs=f_obs, f_exp=f_exp, axis=None)
+        record_chi.loc[par_query, erpr_cat] = f'{chi:.2f} (p={p:.6f})'
+
+record_chi.to_csv(f'{dn}/{outdir}/chi_test_erpr.csv')
 
 #### B. Odds-ratio and confidence intervals calculated via logistic regression ####
 record_ors = pd.DataFrame(
