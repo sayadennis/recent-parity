@@ -247,6 +247,15 @@ for erpr_cat in ['ER/PR+', 'ER/PR-']:
 
 record_t.to_csv(f'{dn}/{outdir}/ttest_erpr_category.csv', index=True)
 
+manual_table = pd.DataFrame(
+    [[42, 13, 19, 11],
+     [46, 23, 22, 16]],
+    index=['RCB 0-1', 'RCB 2-3'],
+    columns=['Nulliparous', '<5 years', '5-10 years', '>=10 years']
+)
+
+chisquare(manual_table)
+
 # #####################################
 # #### Overall logistic regression ####
 # #####################################
