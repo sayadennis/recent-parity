@@ -182,7 +182,7 @@ main_table = pd.DataFrame(
     columns=['main_category', 'sub_category', 'Nulliparous', '<5 years', '5-10 years', '>=10 years']
 )
 
-for colname in ['biomarker_subtypes', 'clin_tumor_stag_cat', 'clin_node_stag_cat']:    
+for colname in ['biomarker_subtypes', 'histology', 'histologic_grade', 'tumor_staging_category', 'node_staging_category']: # 'clin_tumor_stag_cat', 'clin_node_stag_cat'
     if colname!='biomarker_subtypes':
         subtable = pd.crosstab(data[colname], data['parity_category']).rename(
             dd[colname]['Choices, Calculations, OR Slider Labels'],
@@ -202,6 +202,16 @@ for colname in ['biomarker_subtypes', 'clin_tumor_stag_cat', 'clin_node_stag_cat
 main_table['Total'] = main_table[
     ['Nulliparous', '<5 years', '5-10 years', '>=10 years']
 ].sum(axis=1).astype(int)
+
+
+main_table = pd.concat((
+    main_table,
+    pd.DataFrame({'main_category' : 'tumor_size'}, index=['tumor_size'])
+))
+for par_cat in ['Nulliparous', '<5 years', '5-10 years', '>=10 years']:
+    mean = data.iloc[data.parity_category.values==par_cat,:].tumor_size.mean()
+    std = data.iloc[data.parity_category.values==par_cat,:].tumor_size.std()
+    main_table.loc['tumor_size',par_cat] = f'{mean:.2f} (±{std:.2f})'
 
 main_table['super_category'] = 'tumor_char'
 
