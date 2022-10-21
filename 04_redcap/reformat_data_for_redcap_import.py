@@ -10,11 +10,11 @@ proj='/share/fsmresfiles/breast_cancer_pregnancy'
 ###################
 
 ## REDCap features template 
-redcap_features=list(pd.read_csv(f'{proj}/FrequencyAndResultsOfGeneticTe_ImportTemplate_2022-05-31.csv').columns)
+redcap_features=list(pd.read_csv(f'{proj}/data/06_exported_from_redcap/FrequencyAndResultsOfGeneticTe_ImportTemplate_2022-05-31.csv').columns)
 redcap_features.remove('Unnamed: 60')
 
 ## Import reviewed data (missing tumor characteristics)
-rev_comb=pd.read_csv(f'{proj}/data/tkhr_pat_wo_gentest_added/recent_parity_combined_data_reviewed_tkhr_added.csv')
+rev_comb=pd.read_csv(f'{proj}/data/03_reviewed_erica_takahiro/tkhr_pat_wo_gentest_added/recent_parity_combined_data_reviewed_tkhr_added.csv')
 
 ## Import tumor characteristics 
 singles=pd.read_csv(f'{proj}/data/exploratory/singles.csv')

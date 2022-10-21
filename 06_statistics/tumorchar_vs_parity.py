@@ -23,23 +23,6 @@ data = pd.read_csv(f'{dn}/{datadir}/{fn}')
 with open(f'{dn}/{datadir}/data_dictionary.p', 'rb') as f:
     dd = pickle.load(f)
 
-#### TEMPORARY: creating missing data summary ####
-tum_char = ['histology', 'tumor_size', 'histologic_grade', 
-            'tumor_staging_category', 'node_staging_category', 
-            'er_status', 'pr_status', 'her2_status', 'ki67'] # , 'num_ln_positive', 
-
-missing = pd.DataFrame(0, index=['counts'], columns=tum_char+['any'])
-missing_any = []
-for item in tum_char:
-    missing.loc['counts',item] = pd.isnull(data[item]).sum()
-    for record_id in data.iloc[pd.isnull(data[item]).values,:].record_id:
-        if record_id not in missing_any:
-            missing_any.append(record_id)
-
-missing.loc['counts','any'] = len(missing_any)
-missing.to_csv(f'{dn}/summary_tables/missing_tumor_char.csv')
-##################################################
-
 ## Fill in parity category 
 data['parity_category'] = None
 for i in data.index:
