@@ -2,12 +2,25 @@ import re
 import pickle
 import numpy as np
 import pandas as pd
+from collections import defaultdict
+
+dn = '/share/fsmresfiles/breast_cancer_pregnancy'
+
+#################################################
+#### Identify patients who were missing HER2 ####
+#################################################
+
+datadir = 'data/05_import_to_redcap'
+fn = '20220616_redcap_import_data.csv'
+import_to_redcap = pd.read_csv(f'{dn}/{datadir}/{fn}')
+
+correct_her2 = list(import_to_redcap.iloc[pd.isnull(import_to_redcap.her2_status).values,:].index)
+# will split this list between patients with plain text note vs. not at the end 
 
 ############################################
 #### Identify who is missing tumor char ####
 ############################################
 
-dn = '/share/fsmresfiles/breast_cancer_pregnancy'
 datadir = 'data/06_exported_from_redcap'
 fn = 'FrequencyAndResultsO_DATA_2022-10-20_1504.csv'
 redcap = pd.read_csv(f'{dn}/{datadir}/{fn}')
@@ -77,6 +90,8 @@ for pattern in patterns:
 pathol = pathol.loc[found_path,:]
 
 redcap_id_missing_but_no_pathol = []
+correct_her2_dict = defaultdict(list)
+correct_her2_dict['all'] = correct_her2
 
 for i in redcap.index:
     epic_mrn = redcap.loc[i,'epic_mrn']
@@ -91,9 +106,21 @@ for i in redcap.index:
     ),:]
     if matches.shape[0]>0:
         matches.to_csv(f'{dn}/chart_review_resources/pathology_notes_separated_by_patient/redcap_record_id_{i}.csv', index=False)
+        if (i in correct_her2_dict['all']) & (i not in correct_her2_dict['has_pathol']):
+            correct_her2_dict['has_pathol'].append(i)
     elif missing.loc[i,'any']:
-            redcap_id_missing_but_no_pathol.append(i)
+        redcap_id_missing_but_no_pathol.append(i)
+        if (i in correct_her2_dict['all']) & (i not in correct_her2_dict['no_pathol']):
+            correct_her2_dict['no_pathol'].append(i)
+    elif (i in correct_her2_dict['all']) & (i not in correct_her2_dict['no_pathol']):
+            correct_her2_dict['no_pathol'].append(i)
+
 
 with open(f'{dn}/chart_review_resources/redcap_id_missing_but_no_pathol_notes.txt', 'w') as f:
     for item in redcap_id_missing_but_no_pathol:
         f.write(f'{item}\n')
+
+for key in correct_her2_dict.keys():
+    with open(f'{dn}/chart_review_resources/her2_correction_redcap_id_{key}.txt', 'w') as f:
+        for item in correct_her2_dict[key]:
+            f.write(f'{item}\n')
