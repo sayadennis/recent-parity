@@ -44,29 +44,36 @@ missing.to_csv(f'{dn}/summary_tables/missing_tumor_char.csv')
 ########################################
 
 pathol = pd.read_csv(
-    f'{dn}/data/01_ssms_raw/pathology/notes_pathology.csv',
+    f'{dn}/data/01_ssms_raw/pathology/20221129_cohort_pathol_reports.csv',
+    # f'{dn}/data/01_ssms_raw/pathology/notes_pathology.csv',
     header=None
 )
 
-# rename some columns so that it's easier for Andrea to see 
-pathol_colnames = [
-    0,
-    'Epic_MRN',
-    'Powerchart_MRN',
-    'first_name',
-    'last_name',
-    'dob',
-    6,7,8,9,10,
-    'year',
-    12,13,
-    'note',
-    15,16,
-    'note_text'
-]
+with open(f'{dn}/data/01_ssms_raw/pathology/colnames_20221109_cohort_pathol_reports.txt', 'r') as f:
+    lines = f.readlines()
 
-pathol.columns = pathol_colnames
+colnames = [line.strip() for line in lines]
+pathol.columns = colnames
 
-pathol['dob'] = pd.to_datetime(pathol['dob'])
+# # rename some columns so that it's easier for Andrea to see 
+# pathol_colnames = [
+#     0,
+#     'Epic_MRN',
+#     'Powerchart_MRN',
+#     'first_name',
+#     'last_name',
+#     'dob',
+#     6,7,8,9,10,
+#     'year',
+#     12,13,
+#     'note',
+#     15,16,
+#     'note_text'
+# ]
+
+# pathol.columns = pathol_colnames
+
+pathol['dob'] = pd.to_datetime(pathol['birth_date'])
 redcap['dob'] = pd.to_datetime(redcap['dob'])
 
 patterns = [
@@ -83,15 +90,18 @@ found_path = []
 
 for pattern in patterns:
     for i in pathol.index:
-        if re.search(pattern, pathol.loc[i,'note_text'], re.IGNORECASE):
+        if re.search(pattern, pathol.loc[i,'pathol_note_text'], re.IGNORECASE):
             if i not in found_path:
                 found_path.append(i)
 
-pathol = pathol.loc[found_path,:]
+# pathol = pathol.loc[found_path,:]
 
 redcap_id_missing_but_no_pathol = []
+
 correct_her2_dict = defaultdict(list)
-correct_her2_dict['all'] = correct_her2
+for i in correct_her2:
+    if not missing.loc[i,'any']:
+        correct_her2_dict['all'].append(i)
 
 for i in redcap.index:
     epic_mrn = redcap.loc[i,'epic_mrn']
@@ -105,7 +115,7 @@ for i in redcap.index:
         & (pathol['dob'].values==dob)
     ),:]
     if matches.shape[0]>0:
-        matches.to_csv(f'{dn}/chart_review_resources/pathology_notes_separated_by_patient/redcap_record_id_{i}.csv', index=False)
+        matches.to_csv(f'{dn}/chart_review_resources/pathology_notes_separated_by_patient_new/redcap_record_id_{i}.csv', index=False)
         if (i in correct_her2_dict['all']) & (i not in correct_her2_dict['has_pathol']):
             correct_her2_dict['has_pathol'].append(i)
     elif missing.loc[i,'any']:
@@ -116,7 +126,7 @@ for i in redcap.index:
             correct_her2_dict['no_pathol'].append(i)
 
 
-with open(f'{dn}/chart_review_resources/redcap_id_missing_but_no_pathol_notes.txt', 'w') as f:
+with open(f'{dn}/chart_review_resources/redcap_id_missing_but_no_pathol_notes_new.txt', 'w') as f:
     for item in redcap_id_missing_but_no_pathol:
         f.write(f'{item}\n')
 
@@ -124,3 +134,32 @@ for key in correct_her2_dict.keys():
     with open(f'{dn}/chart_review_resources/her2_correction_redcap_id_{key}.txt', 'w') as f:
         for item in correct_her2_dict[key]:
             f.write(f'{item}\n')
+
+
+###################################################
+#### Create assistive files for family history ####
+###################################################
+
+initialcounsel = pd.read_csv(f'{dn}/data/01_ssms_raw/initialcounsel/notes_initial_counsel.csv', header=None)
+
+with open(f'{dn}/data/01_ssms_raw/column_names_note_type_detail.txt', 'r') as f:
+    lines = f.readlines()
+
+colnames = [line.strip() for line in lines]
+
+initialcounsel.columns = colnames
+initialcounsel['dob'] = pd.to_datetime(initialcounsel['birth_date'])
+
+for i in redcap.index:
+    epic_mrn = redcap.loc[i,'epic_mrn']
+    dob = redcap.loc[i,'dob']
+    first_name = redcap.loc[i,'first_name']
+    last_name = redcap.loc[i,'last_name']
+    # if there is a record in pathol that matches these... 
+    matches = initialcounsel.iloc[(
+        (initialcounsel['first_name'].values==first_name)
+        & (initialcounsel['last_name'].values==last_name) 
+        & (initialcounsel['dob'].values==dob)
+    ),:]
+    if matches.shape[0]>0:
+        matches.to_csv(f'{dn}/chart_review_resources/initialcounsel_notes_separated_by_patient_new/redcap_record_id_{i}.csv', index=False)
