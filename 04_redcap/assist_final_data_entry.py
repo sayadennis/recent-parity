@@ -22,11 +22,16 @@ correct_her2 = list(import_to_redcap.iloc[pd.isnull(import_to_redcap.her2_status
 ############################################
 
 datadir = 'data/06_exported_from_redcap'
-fn = 'FrequencyAndResultsO_DATA_2022-10-20_1504.csv'
+fn = 'FrequencyAndResultsO_DATA_2023-02-06_1107.csv'
 redcap = pd.read_csv(f'{dn}/{datadir}/{fn}')
 
 with open(f'{dn}/{datadir}/data_dictionary.p', 'rb') as f:
     dd = pickle.load(f)
+
+# #### Getting text pattern to plug into SSMS query ####
+# with open('/home/srd6051/2023-02-06_mrn_dob_sql_query_pattern_all.txt', 'w') as f:
+#     for mrn_string, dob_string in zip(redcap.iloc[~pd.isnull(redcap.epic_mrn).values,:].epic_mrn.astype(int).astype(str), redcap.iloc[~pd.isnull(redcap.epic_mrn).values,:].dob):
+#         f.write(f"OR (west_mrn LIKE '%{mrn_string[-6:]}') AND birth_date='{dob_string} 00:00:00.00'\n")
 
 tum_char = ['histology', 'tumor_size', 'histologic_grade', 
             'tumor_staging_category', 'node_staging_category', 
@@ -44,15 +49,15 @@ missing.to_csv(f'{dn}/summary_tables/missing_tumor_char.csv')
 ########################################
 
 pathol = pd.read_csv(
-    f'{dn}/data/01_ssms_raw/pathology/20221129_cohort_pathol_reports.csv',
+    f'{dn}/data/01_ssms_raw/pathology/20221213_cohort_pathol_reports.csv',
     # f'{dn}/data/01_ssms_raw/pathology/notes_pathology.csv',
     header=None
 )
 
-with open(f'{dn}/data/01_ssms_raw/pathology/colnames_20221109_cohort_pathol_reports.txt', 'r') as f:
+with open(f'{dn}/data/01_ssms_raw/pathology/colnames_20221213_cohort_pathol_reports.txt', 'r') as f:
     lines = f.readlines()
 
-colnames = [line.strip() for line in lines]
+colnames = lines[0].split()
 pathol.columns = colnames
 
 # # rename some columns so that it's easier for Andrea to see 

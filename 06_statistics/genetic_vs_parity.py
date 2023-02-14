@@ -6,13 +6,24 @@ from datetime import datetime
 from sklearn.utils import resample
 from sklearn.linear_model import LogisticRegression
 
-dn = '/share/fsmresfiles/breast_cancer_pregnancy/data/06_exported_from_redcap'
+din = '/share/fsmresfiles/breast_cancer_pregnancy/data/06_exported_from_redcap'
+dout = '/share/fsmresfiles/breast_cancer_pregnancy/stat_results'
 
 #######################################
 #### Read and lightly process data ####
 #######################################
 
-data = pd.read_csv(f'{dn}/FrequencyAndResultsO_DATA_2022-09-26_1703.csv')
+data = pd.read_csv(f'{din}/FrequencyAndResultsO_DATA_2023-01-17_1220.csv')
+
+# for i in data.index:
+#     firstn = data.loc[i,'first_name']
+#     lastn = data.loc[i,'last_name']
+#     for j in data.index[i+1:]:
+#         query_firstn = data.loc[j,'first_name']
+#         query_lastn = data.loc[j,'last_name']
+#         if ((query_firstn.lower().startswith(firstn.lower())) | (query_firstn.lower().endswith(firstn.lower()))):
+#             if ((query_lastn.lower().startswith(lastn.lower())) | (query_lastn.lower().endswith(lastn.lower()))):
+#                 print(f'Possible match: {i} - {firstn} {lastn} vs. {j} - {query_firstn} {query_lastn}')
 
 ###################################
 #### Define analysis functions ####
@@ -73,6 +84,10 @@ def get_oddsratio_ci(X, y, alpha=0.95, rep=5000):
 #### Perform Analysis ####
 ##########################
 
+results_parity = pd.DataFrame(index=genes, columns=['varname', 'or', 'low', 'high'])
+results_recency10 = pd.DataFrame(index=genes, columns=['varname', 'or', 'low', 'high'])
+results_recency5 = pd.DataFrame(index=genes, columns=['varname', 'or', 'low', 'high'])
+
 for gene in genes:
     print(f'######## Results for {gene} ########')
     X_np, y_np, X_rec, y_rec = generate_lrdata(data, genelist=[gene], recency_thres=10)
@@ -82,12 +97,16 @@ for gene in genes:
         print('# Cannot perform parous vs. nulliparous comparison due to lack of mutation carriers\n')
     else:
         try:
-            X_np_nonan=np.delete(X_np, np.where(np.isnan(X_np))[0], axis=0)
-            y_np_nonan=np.delete(y_np, np.where(np.isnan(X_np))[0])
+            X_np_nonan = np.delete(X_np, np.where(np.isnan(X_np))[0], axis=0)
+            y_np_nonan = np.delete(y_np, np.where(np.isnan(X_np))[0])
             oddsratios, cis = get_oddsratio_ci(X_np_nonan, y_np_nonan)
-            print('\n#### parous vs nulliparous ####')
-            print(f'Odds ratio for parity: {oddsratios[0]:.4f} (95% CIs {cis[0][0]:.4f}-{cis[0][1]:.4f})')
-            print(f'Odds ratio for age: {oddsratios[1]:.4f} (95% CIs {cis[1][0]:.4f}-{cis[1][1]:.4f})\n')
+            results_parity.loc[gene,'varname'] = gene
+            results_parity.loc[gene,'or'] = oddsratios[0]
+            results_parity.loc[gene,'low'] = cis[0][0]
+            results_parity.loc[gene,'high'] = cis[0][1]
+            # print('\n#### parous vs nulliparous ####')
+            # print(f'Odds ratio for parity: {oddsratios[0]:.4f} (95% CIs {cis[0][0]:.4f}-{cis[0][1]:.4f})')
+            # print(f'Odds ratio for age: {oddsratios[1]:.4f} (95% CIs {cis[1][0]:.4f}-{cis[1][1]:.4f})\n')
         except:
             print('Could not calculate odds ratio.\n')
     # 
@@ -99,9 +118,13 @@ for gene in genes:
             X_rec_nonan=np.delete(X_rec, np.where(np.isnan(X_rec))[0], axis=0)
             y_rec_nonan=np.delete(y_rec, np.where(np.isnan(X_rec))[0])
             oddsratios, cis = get_oddsratio_ci(X_rec_nonan, y_rec_nonan)
-            print('\n#### recent vs non-recent (recency threshold 10 years) ####')
-            print(f'Odds ratio for recency: {oddsratios[0]:.4f} (95% CIs {cis[0][0]:.4f}-{cis[0][1]:.4f})')
-            print(f'Odds ratio for age: {oddsratios[1]:.4f} (95% CIs {cis[1][0]:.4f}-{cis[1][1]:.4f})\n')
+            results_recency10.loc[gene,'varname'] = gene
+            results_recency10.loc[gene,'or'] = oddsratios[0]
+            results_recency10.loc[gene,'low'] = cis[0][0]
+            results_recency10.loc[gene,'high'] = cis[0][1]
+            # print('\n#### recent vs non-recent (recency threshold 10 years) ####')
+            # print(f'Odds ratio for recency: {oddsratios[0]:.4f} (95% CIs {cis[0][0]:.4f}-{cis[0][1]:.4f})')
+            # print(f'Odds ratio for age: {oddsratios[1]:.4f} (95% CIs {cis[1][0]:.4f}-{cis[1][1]:.4f})\n')
         except:
             print('Could not calculate odds ratio.\n')
     # 
@@ -114,9 +137,18 @@ for gene in genes:
             X_rec_nonan=np.delete(X_rec, np.where(np.isnan(X_rec))[0], axis=0)
             y_rec_nonan=np.delete(y_rec, np.where(np.isnan(X_rec))[0])
             oddsratios, cis = get_oddsratio_ci(X_rec_nonan, y_rec_nonan)
-            print('\n#### recent vs non-recent (recency threshold 5 years) ####')
-            print(f'Odds ratio for recency: {oddsratios[0]:.4f} (95% CIs {cis[0][0]:.4f}-{cis[0][1]:.4f})')
-            print(f'Odds ratio for age: {oddsratios[1]:.4f} (95% CIs {cis[1][0]:.4f}-{cis[1][1]:.4f})\n')
+            results_recency5.loc[gene,'varname'] = gene
+            results_recency5.loc[gene,'or'] = oddsratios[0]
+            results_recency5.loc[gene,'low'] = cis[0][0]
+            results_recency5.loc[gene,'high'] = cis[0][1]
+            # print('\n#### recent vs non-recent (recency threshold 5 years) ####')
+            # print(f'Odds ratio for recency: {oddsratios[0]:.4f} (95% CIs {cis[0][0]:.4f}-{cis[0][1]:.4f})')
+            # print(f'Odds ratio for age: {oddsratios[1]:.4f} (95% CIs {cis[1][0]:.4f}-{cis[1][1]:.4f})\n')
         except:
             print('Could not calculate odds ratio.\n')
 
+datestring = datetime.now().strftime("%Y%m%d")
+
+results_parity.to_csv(f'{dout}/{datestring}_mutation_vs_parity.csv', index=False)
+results_recency10.to_csv(f'{dout}/{datestring}_mutation_vs_recencyparity10.csv', index=False)
+results_recency5.to_csv(f'{dout}/{datestring}_mutation_vs_recencyparity5.csv', index=False)
