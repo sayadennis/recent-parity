@@ -10,18 +10,26 @@ from sklearn.utils import resample
 from sklearn.linear_model import LogisticRegression
 
 dn = '/share/fsmresfiles/breast_cancer_pregnancy'
+dout = '/share/fsmresfiles/breast_cancer_pregnancy/stat_results'
 
 ###################
 #### Read data ####
 ###################
 
 datadir = 'data/06_exported_from_redcap'
-fn = 'FrequencyAndResultsO_DATA_2022-10-10_0938.csv'
+fn = 'FrequencyAndResultsO_DATA_2023-03-07_1051.csv'
 
 data = pd.read_csv(f'{dn}/{datadir}/{fn}')
 
+# remove exluded patients
+data = data.iloc[(data.exclude_demo.values!=1) & (data.exclude_tum.values!=1),:]
+
 with open(f'{dn}/{datadir}/data_dictionary.p', 'rb') as f:
     dd = pickle.load(f)
+
+#########################################
+#### Fill in useful categorical info ####
+#########################################
 
 ## Fill in parity category 
 data['parity_category'] = None
@@ -37,40 +45,52 @@ for i in data.index:
 
 ## Fill in biomarker subtypes 
 data['biomarker_subtypes'] = None
+data['er_pr_positive'] = None
+data['her2_positive'] = None
+data['triple_negative'] = None
+
+missing_ix = []
 for i in data.index:
+    ## Get ER data and set to None if missing 
     try:
         er = dd['er_status']['Choices, Calculations, OR Slider Labels'][data.loc[i,'er_status']]=='Positive'
-        pr = dd['pr_status']['Choices, Calculations, OR Slider Labels'][data.loc[i,'pr_status']]=='Positive'
     except:
-        er = False
-        pr = False
-        print('Missing ER/PR at index:', i)
-    her2 = dd['her2_status']['Choices, Calculations, OR Slider Labels'][data.loc[i,'her2_status']]=='Positive'
-    if ((er | pr) & (not her2)):
-        data.loc[i,'biomarker_subtypes'] = 'ER/PR+ HER2-'
-    elif ((not er) & (not pr) & (not her2)):
-        data.loc[i,'biomarker_subtypes'] = 'Triple Negative'
-    elif her2:
-        data.loc[i,'biomarker_subtypes'] = 'HER2+'
-    else:
-        print('Unknown pattern at index:', i)
-
-data['er_pr'] = None
-for i in data.index:
+        er = None
+    ## Researt for PR 
     try:
-        er = dd['er_status']['Choices, Calculations, OR Slider Labels'][data.loc[i,'er_status']]=='Positive'
         pr = dd['pr_status']['Choices, Calculations, OR Slider Labels'][data.loc[i,'pr_status']]=='Positive'
     except:
-        er = False
-        pr = False
-        print('Missing ER/PR at index:', i)
-    if (er | pr):
-        data.loc[i,'er_pr'] = 'ER/PR+'
-    else:
-        data.loc[i,'er_pr'] = 'ER/PR-'
-
-summary = pd.read_csv(f'{dn}/summary_tables/super_summary_table.csv')
-summary = summary.iloc[summary.super_category.values=='tumor_char',:].drop('super_category', axis=1)
+        pr = None
+    ## Researt for HER2 
+    try:
+        her2 = dd['her2_status']['Choices, Calculations, OR Slider Labels'][data.loc[i,'her2_status']]=='Positive'
+    except:
+        her2 = None
+    ## Now record information in the main dataframe 
+    if np.all(~pd.isnull([er, pr, her2])): # if all information is available
+        if (np.any([er, pr]) & (not her2)):
+            data.loc[i,'biomarker_subtypes'] = 'ER/PR+ HER2-'
+            data.loc[i,'triple_negative'] = 0
+        elif ((not er) & (not pr) & (not her2)):
+            data.loc[i,'biomarker_subtypes'] = 'Triple Negative'
+            data.loc[i,'triple_negative'] = 1
+        elif her2:
+            data.loc[i,'biomarker_subtypes'] = 'HER2+'
+            data.loc[i,'triple_negative'] = 0
+        else:
+            print('Unknown pattern at index:', i)
+    # 
+    if np.any(~pd.isnull([er, pr])): # if one of ER/PR data is available
+        if np.any([er, pr]):
+            data.loc[i,'er_pr_positive'] = 1
+        else:
+            data.loc[i,'er_pr_positive'] = 0
+    # 
+    if ~pd.isnull(her2): # If HER2 data is available 
+        if her2:
+            data.loc[i,'her2_positive'] = 1
+        else:
+            data.loc[i,'her2_positive'] = 0
 
 #################################################################
 #### Assess the effects of potentially confounding variables ####
@@ -79,49 +99,164 @@ summary = summary.iloc[summary.super_category.values=='tumor_char',:].drop('supe
 # one-way ANOVA for continuous variables 
 # chi-square/Fisher’s Exact tests for categorical variables 
 
-## Age at diagnosis
-ages = {par_cat : data.iloc[data.parity_category.values==par_cat,:].age_at_diagnosis.dropna().values 
-        for par_cat in ['Nulliparous', '<5 years', '5-10 years', '>=10 years']}
-stat, p = f_oneway(ages['Nulliparous'], ages['<5 years'], ages['5-10 years'], ages['>=10 years'])
-
-## Age at first birth 
-ages = {par_cat : data.iloc[data.parity_category.values==par_cat,:].age_at_first_pregnancy.dropna().values 
-        for par_cat in ['Nulliparous', '<5 years', '5-10 years', '>=10 years']}
-stat, p = f_oneway(ages['<5 years'], ages['5-10 years'], ages['>=10 years'])
-
-## Age at last birth 
-ages = {par_cat : data.iloc[data.parity_category.values==par_cat,:].age_at_most_recent_pregnancy.dropna().values 
-        for par_cat in ['Nulliparous', '<5 years', '5-10 years', '>=10 years']}
-stat, p = f_oneway(ages['<5 years'], ages['5-10 years'], ages['>=10 years'])
-
 ## Tumor size 
 sizes = {par_cat : data.iloc[data.parity_category.values==par_cat,:].tumor_size.dropna().values 
         for par_cat in ['Nulliparous', '<5 years', '5-10 years', '>=10 years']}
 stat, p = f_oneway(sizes['Nulliparous'], sizes['<5 years'], sizes['5-10 years'], sizes['>=10 years'])
 
-## Tumor grade 
+print('#### Statistical test for tumor size ####')
+print(f'One-way ANOVA f={stat:.4f} (p={p:.4f})\n')
+
+## Tumor grade ### We need to determine how to test this 
 crosstab = pd.crosstab(data['histologic_grade'], data['parity_category']).rename(
     dd['histologic_grade']['Choices, Calculations, OR Slider Labels'],
     axis=0
 )
 stat, p = chisquare(crosstab, axis=0)
 
-## Positive lymph nodes (high missing for our data) 
-# data.num_ln_positive>0
+print('#### Statistical test for tumor histologic grade ####')
+print(crosstab)
+for i, parity_category in enumerate(crosstab.columns):
+    print(f'Chi-squared test for {parity_category} chi={stat[i]:.2e} (p={p[i]:.2e})')
 
 ##########################################################
 #### Assess the associations between tumor and parity ####
 ##########################################################
 
-## ER
+###################################
+#### Define analysis functions #### FIX FROM HERE !!!!
+###################################
 
-## PR
+feature_names=['her2_positive', 'triple_negative', 'er_pr_positive']
 
-## ER or PR 
+def generate_lrdata(df, feature_name, recency_thres=10):
+    lrdata = pd.DataFrame(None, index=None, columns=['parous', feature_name, 'recent', 'age', 'fam_hx'])
+    for i in range(df.shape[0]):
+        pat_dict = {}
+        pat_dict['parous'] = [df['parous'].iloc[i]] # binary 0/1
+        pat_dict[feature_name] = [df[feature_name].iloc[i]]
+        pat_dict['recent'] = [int(df['years_since_pregnancy'].iloc[i] < recency_thres)]
+        pat_dict['age'] = [df['age_at_diagnosis'].iloc[i]]
+        pat_dict['fam_hx'] = [df['fam_hx'].iloc[i]]
+        if np.any(pd.isnull(list(pat_dict.values()))):
+            continue
+        lrdata = pd.concat((lrdata, pd.DataFrame(pat_dict)), ignore_index=True)
+    # data for nulliparous vs. parous 
+    X_np = np.array(lrdata[['parous', 'age', 'fam_hx']], dtype=float)
+    X_np[:,1] = (X_np[:,1] - np.mean(X_np[:,1]))/np.std(X_np[:,1]) # standard scale
+    y_np = np.array(lrdata[feature_name], dtype=float)
+    # data for recency of parity --only select women who are parous
+    X_rec = np.array(lrdata.iloc[lrdata['parous'].values==1][['recent', 'age', 'fam_hx']], dtype=float)
+    X_rec[:,1] = (X_rec[:,1] - np.mean(X_rec[:,1]))/np.std(X_rec[:,1]) # standard scale
+    y_rec = np.array(lrdata.iloc[lrdata['parous'].values==1][feature_name], dtype=float)
+    return X_np, y_np, X_rec, y_rec
 
-## HER2
+def get_oddsratio_ci(X, y, alpha=0.95, rep=5000):
+    or1, or2, or3 = [], [], []
+    i = 0
+    for i in range(rep):
+        X_bs, y_bs = resample(X, y, random_state=i) # create bootstrap (bs) sample
+        if ~np.all(y_bs==0):
+            lrm = LogisticRegression(penalty='l2', solver='lbfgs')
+            lrm.fit(X_bs, y_bs)
+            or1.append(np.exp(lrm.coef_[0][0]))
+            or2.append(np.exp(lrm.coef_[0][1]))
+            or3.append(np.exp(lrm.coef_[0][2]))
+        else:
+            continue
+    oddsratio = (np.mean(or1), np.mean(or2), np.mean(or3))
+    ci = ()
+    # first get ci1
+    p = ((1.0-alpha)/2.0) * 100
+    lower = max(0.0, np.percentile(or1, p))
+    p = (alpha+((1.0-alpha)/2.0)) * 100
+    upper = np.percentile(or1, p)
+    ci1 = (lower, upper)
+    # next get ci2
+    p = ((1.0-alpha)/2.0) * 100
+    lower = max(0.0, np.percentile(or2, p))
+    p = (alpha+((1.0-alpha)/2.0)) * 100
+    upper = np.percentile(or2, p)
+    ci2 = (lower, upper)
+    # finally get ci3
+    p = ((1.0-alpha)/2.0) * 100
+    lower = max(0.0, np.percentile(or3, p))
+    p = (alpha+((1.0-alpha)/2.0)) * 100
+    upper = np.percentile(or3, p)
+    ci3 = (lower, upper)
+    # combine all
+    ci = (ci1, ci2, ci3)
+    return oddsratio, ci
 
-## Triple Negative 
+##########################
+#### Perform Analysis ####
+##########################
 
-## Biological subtypes 
+results_parity = pd.DataFrame(index=feature_names, columns=['varname', 'or', 'low', 'high'])
+results_recency5 = pd.DataFrame(index=feature_names, columns=['varname', 'or', 'low', 'high'])
+results_recency10 = pd.DataFrame(index=feature_names, columns=['varname', 'or', 'low', 'high'])
 
+for feature_name in feature_names:
+    print(f'######## Results for {feature_name} ########')
+    X_np, y_np, X_rec, y_rec = generate_lrdata(data, feature_name=feature_name, recency_thres=10)
+    #
+    # if np.all(y_np==0):
+    if ((np.sum((X_np[:,0]==0) & (y_np==1))==0) | (np.sum((X_np[:,0]==1) & (y_np==1))==0)):
+        print('# Cannot perform parous vs. nulliparous comparison due to lack of mutation carriers\n')
+    else:
+        try:
+            X_np_nonan = np.delete(X_np, np.where(np.isnan(X_np))[0], axis=0)
+            y_np_nonan = np.delete(y_np, np.where(np.isnan(X_np))[0])
+            oddsratios, cis = get_oddsratio_ci(X_np_nonan, y_np_nonan)
+            results_parity.loc[feature_name,'varname'] = feature_name
+            results_parity.loc[feature_name,'or'] = oddsratios[0]
+            results_parity.loc[feature_name,'low'] = cis[0][0]
+            results_parity.loc[feature_name,'high'] = cis[0][1]
+            # print('\n#### parous vs nulliparous ####')
+            # print(f'Odds ratio for parity: {oddsratios[0]:.4f} (95% CIs {cis[0][0]:.4f}-{cis[0][1]:.4f})')
+            # print(f'Odds ratio for age: {oddsratios[1]:.4f} (95% CIs {cis[1][0]:.4f}-{cis[1][1]:.4f})\n')
+        except:
+            print('Could not calculate odds ratio.\n')
+    # 
+    # if np.all(y_rec==0):
+    if ((np.sum((X_np[:,0]==0) & (y_np==1))==0) | (np.sum((X_np[:,0]==1) & (y_np==1))==0)):
+        print('# Cannot perform recent vs. non-recent comparison with 10-year cutoff due to lack of mutation carriers in certain categories\n')
+    else:
+        try:
+            X_rec_nonan=np.delete(X_rec, np.where(np.isnan(X_rec))[0], axis=0)
+            y_rec_nonan=np.delete(y_rec, np.where(np.isnan(X_rec))[0])
+            oddsratios, cis = get_oddsratio_ci(X_rec_nonan, y_rec_nonan)
+            results_recency10.loc[feature_name,'varname'] = feature_name
+            results_recency10.loc[feature_name,'or'] = oddsratios[0]
+            results_recency10.loc[feature_name,'low'] = cis[0][0]
+            results_recency10.loc[feature_name,'high'] = cis[0][1]
+            # print('\n#### recent vs non-recent (recency threshold 10 years) ####')
+            # print(f'Odds ratio for recency: {oddsratios[0]:.4f} (95% CIs {cis[0][0]:.4f}-{cis[0][1]:.4f})')
+            # print(f'Odds ratio for age: {oddsratios[1]:.4f} (95% CIs {cis[1][0]:.4f}-{cis[1][1]:.4f})\n')
+        except:
+            print('Could not calculate odds ratio.\n')
+    # 
+    X_np, y_np, X_rec, y_rec = generate_lrdata(data, feature_name=feature_name, recency_thres=5)
+    # if np.all(y_rec==0):
+    if ((np.sum((X_np[:,0]==0) & (y_np==1))==0) | (np.sum((X_np[:,0]==1) & (y_np==1))==0)):
+        print('# Cannot perform recent vs. non-recent comparison with 5-year cutoff due to lack of mutation carriers in certain categories\n')
+    else:
+        try:
+            X_rec_nonan=np.delete(X_rec, np.where(np.isnan(X_rec))[0], axis=0)
+            y_rec_nonan=np.delete(y_rec, np.where(np.isnan(X_rec))[0])
+            oddsratios, cis = get_oddsratio_ci(X_rec_nonan, y_rec_nonan)
+            results_recency5.loc[feature_name,'varname'] = feature_name
+            results_recency5.loc[feature_name,'or'] = oddsratios[0]
+            results_recency5.loc[feature_name,'low'] = cis[0][0]
+            results_recency5.loc[feature_name,'high'] = cis[0][1]
+            # print('\n#### recent vs non-recent (recency threshold 5 years) ####')
+            # print(f'Odds ratio for recency: {oddsratios[0]:.4f} (95% CIs {cis[0][0]:.4f}-{cis[0][1]:.4f})')
+            # print(f'Odds ratio for age: {oddsratios[1]:.4f} (95% CIs {cis[1][0]:.4f}-{cis[1][1]:.4f})\n')
+        except:
+            print('Could not calculate odds ratio.\n')
+
+datestring = datetime.now().strftime("%Y%m%d")
+
+results_parity.to_csv(f'{dout}/{datestring}_tumchar_vs_parity.csv', index=False)
+results_recency10.to_csv(f'{dout}/{datestring}_tumchar_vs_recencyparity10.csv', index=False)
+results_recency5.to_csv(f'{dout}/{datestring}_tumchar_vs_recencyparity5.csv', index=False)

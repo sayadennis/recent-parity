@@ -9,7 +9,18 @@ import string # only for troubleshooting purposes
 din = '/share/fsmresfiles/breast_cancer_pregnancy/stat_results'
 dout = '/share/fsmresfiles/breast_cancer_pregnancy/plots'
 
-for fn in ['20230120_mutation_vs_recencyparity5.csv', '20230120_mutation_vs_recencyparity10.csv', '20230120_mutation_vs_parity.csv']:
+results_fn = [
+    # mutation vs parity 
+    '20230307_mutation_vs_recencyparity5.csv', 
+    '20230307_mutation_vs_recencyparity10.csv', 
+    '20230307_mutation_vs_parity.csv',
+    # tumor characteristics vs parity 
+    '20230307_tumchar_vs_recencyparity5.csv', 
+    '20230307_tumchar_vs_recencyparity10.csv', 
+    '20230307_tumchar_vs_parity.csv',
+]
+
+for fn in results_fn:
     df = pd.read_csv(f'{din}/{fn}')
 
     # df = pd.DataFrame(

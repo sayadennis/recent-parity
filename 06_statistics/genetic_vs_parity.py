@@ -13,7 +13,13 @@ dout = '/share/fsmresfiles/breast_cancer_pregnancy/stat_results'
 #### Read and lightly process data ####
 #######################################
 
-data = pd.read_csv(f'{din}/FrequencyAndResultsO_DATA_2023-01-17_1220.csv')
+data = pd.read_csv(f'{din}/FrequencyAndResultsO_DATA_2023-03-07_1051.csv')
+
+# remove exluded patients
+data = data.iloc[(data.exclude_demo.values!=1) & (data.exclude_tum.values!=1),:]
+
+# mark family history as none for patients who are missing it 
+data.fam_hx = data.fam_hx.fillna(0.)
 
 # for i in data.index:
 #     firstn = data.loc[i,'first_name']
@@ -32,26 +38,27 @@ data = pd.read_csv(f'{din}/FrequencyAndResultsO_DATA_2023-01-17_1220.csv')
 genes=['any_patho_mutation', 'brca1', 'brca2', 'palb2', 'tp53', 'chek2', 'pten', 'cdh1', 'stk11', 'atm']
 
 def generate_lrdata(df, genelist=genes, recency_thres=10):
-    lrdata = pd.DataFrame(None, index=None, columns=['parous', 'has_mutation', 'recent', 'age'])
+    lrdata = pd.DataFrame(None, index=None, columns=['parous', 'has_mutation', 'recent', 'age', 'fam_hx'])
     for i in range(df.shape[0]):
         pat_dict = {}
         pat_dict['parous'] = [df['parous'].iloc[i]] # binary 0/1
         pat_dict['has_mutation'] = [float(df[genelist].iloc[i]==1)] # {'Present':1, 'Absent':2}
         pat_dict['recent'] = [int(df['years_since_pregnancy'].iloc[i] < recency_thres)]
         pat_dict['age'] = [df['age_at_diagnosis'].iloc[i]]
+        pat_dict['fam_hx'] = [df['fam_hx'].iloc[i]]
         lrdata = pd.concat((lrdata, pd.DataFrame(pat_dict)), ignore_index=True)
     # data for nulliparous vs. parous 
-    X_np = np.array(lrdata[['parous', 'age']], dtype=float)
+    X_np = np.array(lrdata[['parous', 'age', 'fam_hx']], dtype=float)
     X_np[:,1] = (X_np[:,1] - np.mean(X_np[:,1]))/np.std(X_np[:,1]) # standard scale
     y_np = np.array(lrdata['has_mutation'], dtype=float)
     # data for recency of parity --only select women who are parous
-    X_rec = np.array(lrdata.iloc[lrdata['parous'].values==1][['recent', 'age']], dtype=float)
+    X_rec = np.array(lrdata.iloc[lrdata['parous'].values==1][['recent', 'age', 'fam_hx']], dtype=float)
     X_rec[:,1] = (X_rec[:,1] - np.mean(X_rec[:,1]))/np.std(X_rec[:,1]) # standard scale
     y_rec = np.array(lrdata.iloc[lrdata['parous'].values==1]['has_mutation'], dtype=float)
     return X_np, y_np, X_rec, y_rec
 
 def get_oddsratio_ci(X, y, alpha=0.95, rep=5000):
-    or1, or2 = [], []
+    or1, or2, or3 = [], [], []
     i = 0
     for i in range(rep):
         X_bs, y_bs = resample(X, y, random_state=i) # create bootstrap (bs) sample
@@ -60,9 +67,10 @@ def get_oddsratio_ci(X, y, alpha=0.95, rep=5000):
             lrm.fit(X_bs, y_bs)
             or1.append(np.exp(lrm.coef_[0][0]))
             or2.append(np.exp(lrm.coef_[0][1]))
+            or3.append(np.exp(lrm.coef_[0][2]))
         else:
             continue
-    oddsratio = (np.mean(or1), np.mean(or2))
+    oddsratio = (np.mean(or1), np.mean(or2), np.mean(or3))
     ci = ()
     # first get ci1
     p = ((1.0-alpha)/2.0) * 100
@@ -76,7 +84,14 @@ def get_oddsratio_ci(X, y, alpha=0.95, rep=5000):
     p = (alpha+((1.0-alpha)/2.0)) * 100
     upper = np.percentile(or2, p)
     ci2 = (lower, upper)
-    ci = (ci1, ci2)
+    # finally get ci3
+    p = ((1.0-alpha)/2.0) * 100
+    lower = max(0.0, np.percentile(or3, p))
+    p = (alpha+((1.0-alpha)/2.0)) * 100
+    upper = np.percentile(or3, p)
+    ci3 = (lower, upper)
+    # combine all
+    ci = (ci1, ci2, ci3)
     return oddsratio, ci
 
 

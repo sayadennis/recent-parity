@@ -6,11 +6,14 @@ dn = '/share/fsmresfiles/breast_cancer_pregnancy'
 
 ## Load data & data dictionary
 datadir = 'data/06_exported_from_redcap'
-fn = 'FrequencyAndResultsO_DATA_2023-01-17_1220.csv'
+fn = 'FrequencyAndResultsO_DATA_2023-03-07_1051.csv'
 data = pd.read_csv(f'{dn}/{datadir}/{fn}')
 
 with open(f'{dn}/{datadir}/data_dictionary.p', 'rb') as f:
     dd = pickle.load(f)
+
+# remove exluded patients
+data = data.iloc[(data.exclude_demo.values!=1) & (data.exclude_tum.values!=1),:]
 
 # Select only patients with neoadjuvant therapy if necessary
 sumtabdir = 'summary_tables'

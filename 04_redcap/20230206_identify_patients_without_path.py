@@ -9,7 +9,7 @@ dn = '/share/fsmresfiles/breast_cancer_pregnancy'
 ##########################
 
 datadir = 'data/06_exported_from_redcap'
-fn = 'FrequencyAndResultsO_DATA_2023-02-13_1219.csv'
+fn = 'FrequencyAndResultsO_DATA_2023-02-28_1654.csv'
 redcap = pd.read_csv(f'{dn}/{datadir}/{fn}')
 
 with open(f'{dn}/{datadir}/data_dictionary.p', 'rb') as f:
@@ -61,6 +61,9 @@ with open('/home/srd6051/recent_parity/2023-02-08_redcap_id_without_pathology_re
 tumchar_incomplete = redcap.iloc[
     redcap.tumor_characteristics_complete.map({0: 'Incomplete', 1: 'Unverified', 2: 'Complete'}).values!='Complete',:
 ]
+
+missing_tumchar_but_haspath = set(tumchar_incomplete.record_id.values).intersection(set(haspath_redcap_id))
+takahiro_saw_only_cnb = [51,88,100,103,106,139,160,203,206,220,303,346,406,412,433,458,491,500,502,519,523,525,530,534,540,542,546,562,570,585,630,638,651,668,682,695,731,745,748,755,758,770,786,790,798,808,843,907]
 
 upset_data = pd.DataFrame(
     index=redcap.record_id.values, 
@@ -133,6 +136,8 @@ colnames = [line.strip() for line in lines]
 initialcounsel.columns = colnames
 initialcounsel['dob'] = pd.to_datetime(initialcounsel['birth_date'])
 
+no_initialcounsel_famhx_missing = []
+
 for i in redcap.index:
     epic_mrn = redcap.loc[i,'epic_mrn']
     dob = redcap.loc[i,'dob']
@@ -146,3 +151,5 @@ for i in redcap.index:
     ),:]
     if matches.shape[0]>0:
         matches.to_csv(f'{dn}/chart_review_resources/initialcounsel_notes_separated_by_patient_new/redcap_record_id_{i}.csv', index=False)
+    elif redcap.loc[i, 'geneticsfam_hx_complete']==0:
+        no_initialcounsel_famhx_missing.append(redcap.loc[i,'record_id'])
