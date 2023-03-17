@@ -15,9 +15,9 @@ results_fn = [
     '20230307_mutation_vs_recencyparity10.csv', 
     '20230307_mutation_vs_parity.csv',
     # tumor characteristics vs parity 
-    '20230307_tumchar_vs_recencyparity5.csv', 
-    '20230307_tumchar_vs_recencyparity10.csv', 
-    '20230307_tumchar_vs_parity.csv',
+    '20230316_tumchar_vs_recencyparity5.csv', 
+    '20230316_tumchar_vs_recencyparity10.csv', 
+    '20230316_tumchar_vs_parity.csv',
 ]
 
 for fn in results_fn:

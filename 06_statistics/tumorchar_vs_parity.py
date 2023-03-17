@@ -123,10 +123,6 @@ for i, parity_category in enumerate(crosstab.columns):
 #### Assess the associations between tumor and parity ####
 ##########################################################
 
-###################################
-#### Define analysis functions #### FIX FROM HERE !!!!
-###################################
-
 feature_names=['her2_positive', 'triple_negative', 'er_pr_positive']
 
 def generate_lrdata(df, feature_name, recency_thres=10):
