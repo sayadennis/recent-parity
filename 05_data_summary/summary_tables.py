@@ -1,12 +1,13 @@
 import numpy as np
 import pandas as pd
 import pickle
+from datetime import datetime
 
 dn = '/share/fsmresfiles/breast_cancer_pregnancy'
 
 ## Load data & data dictionary
 datadir = 'data/06_exported_from_redcap'
-fn = 'FrequencyAndResultsO_DATA_2023-03-07_1051.csv'
+fn = 'FrequencyAndResultsO_DATA_2023-03-17_0949.csv'
 data = pd.read_csv(f'{dn}/{datadir}/{fn}')
 
 with open(f'{dn}/{datadir}/data_dictionary.p', 'rb') as f:
@@ -17,12 +18,6 @@ data = data.iloc[(data.exclude_demo.values!=1) & (data.exclude_tum.values!=1),:]
 
 # Select only patients with neoadjuvant therapy if necessary
 sumtabdir = 'summary_tables'
-
-nat_only = False
-
-if nat_only:
-    data = data.iloc[data.nat.values==1,]
-    sumtabdir = 'summary_tables/nac_only'
 
 #########################################
 #### Fill in useful categorical info ####
@@ -84,7 +79,7 @@ for i in data.index:
 super_table = pd.DataFrame(
     columns=['super_category', 'main_category', 'sub_category', 
              'Nulliparous', '<5 years', '5-10 years', '>=10 years',
-             'Total']
+             'Overall']
 )
 
 #####################
@@ -96,6 +91,10 @@ main_table = pd.DataFrame(
     index=['Mean age (±SD)'],
     columns=super_table.columns
 )
+mean = data.age_at_diagnosis.mean()
+std = data.age_at_diagnosis.std()
+main_table.loc['Mean age (±SD)','Overall'] = f'{mean:.2f} (±{std:.2f})'
+
 for par_cat in ['Nulliparous', '<5 years', '5-10 years', '>=10 years']:
     mean = data.iloc[data.parity_category.values==par_cat,:].age_at_diagnosis.mean()
     std = data.iloc[data.parity_category.values==par_cat,:].age_at_diagnosis.std()
@@ -118,6 +117,12 @@ main_table = pd.DataFrame(
     index=['Mean Gravida (±SD)', 'Mean Para (±SD)'],
     columns=['Nulliparous', '<5 years', '5-10 years', '>=10 years']
 )
+
+for varname, tablevarname in zip(['number_pregnancies', 'number_births'], ['Mean Gravida (±SD)', 'Mean Para (±SD)']):
+    mean = data[varname].mean()
+    std = data[varname].std()
+    main_table.loc[tablevarname,'Overall'] = f'{mean:.2f} (±{std:.2f})'
+
 
 for par_cat in ['Nulliparous', '<5 years', '5-10 years', '>=10 years']:
     # Gravida 
@@ -164,7 +169,7 @@ for key in dd.keys():
                     )=='Pathogenic')
             main_table = pd.concat((main_table, pd.DataFrame(cts, index=[key.upper()])))
 
-main_table['Total'] = main_table[
+main_table['Overall'] = main_table[
     ['Nulliparous', '<5 years', '5-10 years', '>=10 years']
 ].sum(axis=1).astype(int)
 
@@ -182,7 +187,7 @@ super_table = pd.concat((
 ###############################
 
 main_table = pd.DataFrame(
-    columns=['main_category', 'sub_category', 'Nulliparous', '<5 years', '5-10 years', '>=10 years']
+    columns=['main_category', 'sub_category', 'Nulliparous', '<5 years', '5-10 years', '>=10 years', 'Overall']
 )
 
 for colname in ['biomarker_subtypes', 'histology', 'histologic_grade', 'tumor_staging_category', 'node_staging_category']: # 'clin_tumor_stag_cat', 'clin_node_stag_cat'
@@ -202,15 +207,25 @@ for colname in ['biomarker_subtypes', 'histology', 'histologic_grade', 'tumor_st
         subtable
     ))
 
-main_table['Total'] = main_table[
+main_table['Overall'] = main_table[
     ['Nulliparous', '<5 years', '5-10 years', '>=10 years']
 ].sum(axis=1).astype(int)
 
+main_table.reset_index(drop=True, inplace=True)
+
+for i in main_table.index:
+    for par_cat in ['Nulliparous', '<5 years', '5-10 years', '>=10 years']:
+        ct = main_table.loc[i,par_cat]
+        pct = main_table.loc[i,par_cat]/main_table.loc[i,'Overall']*100
+        main_table.loc[i,par_cat] = f'{ct} ({pct:.1f}%)'
 
 main_table = pd.concat((
     main_table,
     pd.DataFrame({'main_category' : 'tumor_size'}, index=['tumor_size'])
 ))
+mean = data.tumor_size.mean()
+std = data.tumor_size.std()
+main_table.loc['tumor_size','Overall'] = f'{mean:.2f} (±{std:.2f})'
 for par_cat in ['Nulliparous', '<5 years', '5-10 years', '>=10 years']:
     mean = data.iloc[data.parity_category.values==par_cat,:].tumor_size.mean()
     std = data.iloc[data.parity_category.values==par_cat,:].tumor_size.std()
@@ -260,7 +275,7 @@ for colname in ['nat', 'nat_reg', 'her2_therapy', 'rcb', 'rcb_category']:
     main_table = pd.concat((main_table, sub_table))
 
 
-main_table['Total'] = main_table[
+main_table['Overall'] = main_table[
     ['Nulliparous', '<5 years', '5-10 years', '>=10 years']
 ].sum(axis=1).astype(int)
 
@@ -272,4 +287,6 @@ super_table = pd.concat((
     main_table
 ))
 
-super_table.to_csv(f'{dn}/{sumtabdir}/super_summary_table.csv', index=False)
+datestring = datetime.now().strftime("%Y%m%d")
+
+super_table.to_csv(f'{dn}/{sumtabdir}/{datestring}_super_summary_table.csv', index=False)
