@@ -17,7 +17,7 @@ dout = '/share/fsmresfiles/breast_cancer_pregnancy/stat_results'
 ###################
 
 datadir = 'data/06_exported_from_redcap'
-fn = 'FrequencyAndResultsO_DATA_2023-03-07_1051.csv'
+fn = 'FrequencyAndResultsO_DATA_2023-03-17_0949.csv'
 
 data = pd.read_csv(f'{dn}/{datadir}/{fn}')
 
@@ -160,29 +160,17 @@ def get_oddsratio_ci(X, y, alpha=0.95, rep=5000):
             or3.append(np.exp(lrm.coef_[0][2]))
         else:
             continue
-    oddsratio = (np.mean(or1), np.mean(or2), np.mean(or3))
-    ci = ()
+    oddsratios = [np.mean(or1), np.mean(or2), np.mean(or3)]
     # first get ci1
-    p = ((1.0-alpha)/2.0) * 100
-    lower = max(0.0, np.percentile(or1, p))
-    p = (alpha+((1.0-alpha)/2.0)) * 100
-    upper = np.percentile(or1, p)
-    ci1 = (lower, upper)
-    # next get ci2
-    p = ((1.0-alpha)/2.0) * 100
-    lower = max(0.0, np.percentile(or2, p))
-    p = (alpha+((1.0-alpha)/2.0)) * 100
-    upper = np.percentile(or2, p)
-    ci2 = (lower, upper)
-    # finally get ci3
-    p = ((1.0-alpha)/2.0) * 100
-    lower = max(0.0, np.percentile(or3, p))
-    p = (alpha+((1.0-alpha)/2.0)) * 100
-    upper = np.percentile(or3, p)
-    ci3 = (lower, upper)
-    # combine all
-    ci = (ci1, ci2, ci3)
-    return oddsratio, ci
+    ci_lower = ((1.0-alpha)/2.0) * 100
+    ci_higher = (alpha+((1.0-alpha)/2.0)) * 100
+    ci, pvals = [], []
+    for bs_sample in [or1, or2, or3]:
+        lower = max(0.0, np.percentile(bs_sample, ci_lower))
+        upper = np.percentile(bs_sample, ci_higher)
+        ci.append((lower, upper))
+        pvals.append(np.min([(np.array(bs_sample)<1).mean(), (np.array(bs_sample)>1).mean()])*2)
+    return oddsratios, ci, pvals
 
 ##########################
 #### Perform Analysis ####
@@ -198,7 +186,7 @@ for feature_name in feature_names:
     #
     # if np.all(y_np==0):
     if ((np.sum((X_np[:,0]==0) & (y_np==1))==0) | (np.sum((X_np[:,0]==1) & (y_np==1))==0)):
-        print('# Cannot perform parous vs. nulliparous comparison due to lack of mutation carriers\n')
+        print('# Cannot perform parous vs. nulliparous comparison due to lack of data\n')
     else:
         try:
             X_np_nonan = np.delete(X_np, np.where(np.isnan(X_np))[0], axis=0)
@@ -215,8 +203,8 @@ for feature_name in feature_names:
             print('Could not calculate odds ratio.\n')
     # 
     # if np.all(y_rec==0):
-    if ((np.sum((X_np[:,0]==0) & (y_np==1))==0) | (np.sum((X_np[:,0]==1) & (y_np==1))==0)):
-        print('# Cannot perform recent vs. non-recent comparison with 10-year cutoff due to lack of mutation carriers in certain categories\n')
+    if ((np.sum((X_rec[:,0]==0) & (y_rec==1))==0) | (np.sum((X_rec[:,0]==1) & (y_rec==1))==0)):
+        print('# Cannot perform recent vs. non-recent comparison with 10-year cutoff due to lack of data\n')
     else:
         try:
             X_rec_nonan=np.delete(X_rec, np.where(np.isnan(X_rec))[0], axis=0)
@@ -234,8 +222,8 @@ for feature_name in feature_names:
     # 
     X_np, y_np, X_rec, y_rec = generate_lrdata(data, feature_name=feature_name, recency_thres=5)
     # if np.all(y_rec==0):
-    if ((np.sum((X_np[:,0]==0) & (y_np==1))==0) | (np.sum((X_np[:,0]==1) & (y_np==1))==0)):
-        print('# Cannot perform recent vs. non-recent comparison with 5-year cutoff due to lack of mutation carriers in certain categories\n')
+    if ((np.sum((X_rec[:,0]==0) & (y_rec==1))==0) | (np.sum((X_rec[:,0]==1) & (y_rec==1))==0)):
+        print('# Cannot perform recent vs. non-recent comparison with 5-year cutoff due to lack of data\n')
     else:
         try:
             X_rec_nonan=np.delete(X_rec, np.where(np.isnan(X_rec))[0], axis=0)

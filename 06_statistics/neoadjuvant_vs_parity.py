@@ -10,8 +10,7 @@ from sklearn.utils import resample
 from sklearn.linear_model import LogisticRegression
 
 dn = '/share/fsmresfiles/breast_cancer_pregnancy'
-
-datestring = datetime.now().strftime("%Y%m%d")
+dout = '/share/fsmresfiles/breast_cancer_pregnancy/stat_results'
 
 ###################
 #### Read data ####
@@ -21,6 +20,10 @@ datadir = 'data/06_exported_from_redcap'
 fn = 'FrequencyAndResultsO_DATA_2023-03-17_0949.csv'
 
 data = pd.read_csv(f'{dn}/{datadir}/{fn}')
+
+# remove exluded patients
+data = data.iloc[(data.exclude_demo.values!=1) & (data.exclude_tum.values!=1),:]
+
 data = data.iloc[data.nat.values==1,]
 
 with open(f'{dn}/{datadir}/data_dictionary.p', 'rb') as f:
@@ -81,9 +84,37 @@ for i in data.index:
     else:
         data.loc[i,'er_pr'] = 'ER/PR-'
 
+data['pCR'] = (data.response_nat.map(dd['response_nat']['Choices, Calculations, OR Slider Labels'])=='No residual disease').astype(int)
+data['positive'] = ((
+    (data.rcb_category.map(dd['rcb_category']['Choices, Calculations, OR Slider Labels'])=='0').values |
+    (data.rcb_category.map(dd['rcb_category']['Choices, Calculations, OR Slider Labels'])=='1').values
+)).astype(int)
+
 ##########################
 #### Define functions ####
 ##########################
+
+def generate_lrdata(df, feature_name, recency_thres=10):
+    lrdata = pd.DataFrame(None, index=None, columns=['parous', feature_name, 'recent', 'age', 'fam_hx'])
+    for i in range(df.shape[0]):
+        pat_dict = {}
+        pat_dict['parous'] = [df['parous'].iloc[i]] # binary 0/1
+        pat_dict[feature_name] = [df[feature_name].iloc[i]]
+        pat_dict['recent'] = [int(df['years_since_pregnancy'].iloc[i] < recency_thres)]
+        pat_dict['age'] = [df['age_at_diagnosis'].iloc[i]]
+        pat_dict['fam_hx'] = [df['fam_hx'].iloc[i]]
+        if np.any(pd.isnull(list(pat_dict.values()))):
+            continue
+        lrdata = pd.concat((lrdata, pd.DataFrame(pat_dict)), ignore_index=True)
+    # data for nulliparous vs. parous 
+    X_np = np.array(lrdata[['parous', 'age', 'fam_hx']], dtype=float)
+    X_np[:,1] = (X_np[:,1] - np.mean(X_np[:,1]))/np.std(X_np[:,1]) # standard scale
+    y_np = np.array(lrdata[feature_name], dtype=float)
+    # data for recency of parity --only select women who are parous
+    X_rec = np.array(lrdata.iloc[lrdata['parous'].values==1][['recent', 'age', 'fam_hx']], dtype=float)
+    X_rec[:,1] = (X_rec[:,1] - np.mean(X_rec[:,1]))/np.std(X_rec[:,1]) # standard scale
+    y_rec = np.array(lrdata.iloc[lrdata['parous'].values==1][feature_name], dtype=float)
+    return X_np, y_np, X_rec, y_rec
 
 def get_oddsratio_ci(X, y, alpha=0.95, rep=5000):
     oddsratio = {}
@@ -100,178 +131,136 @@ def get_oddsratio_ci(X, y, alpha=0.95, rep=5000):
         else:
             continue
     mean_or = [np.mean(oddsratio[colnum]) for colnum in range(X.shape[1])]
-    ci = []
+    ci, pvals = [], []
+    ci_lower = ((1.0-alpha)/2.0) * 100
+    ci_higher = (alpha+((1.0-alpha)/2.0)) * 100
     for colnum in range(X.shape[1]):
         # first get ci1
-        p = ((1.0-alpha)/2.0) * 100
-        lower = max(0.0, np.percentile(oddsratio[colnum], p))
-        p = (alpha+((1.0-alpha)/2.0)) * 100
-        upper = np.percentile(oddsratio[colnum], p)
+        lower = max(0.0, np.percentile(oddsratio[colnum], ci_lower))
+        upper = np.percentile(oddsratio[colnum], ci_higher)
         ci.append((lower, upper))
-    return mean_or, ci
+        pvals.append(np.min([(np.array(oddsratio[colnum])<1).mean(), (np.array(oddsratio[colnum])>1).mean()])*2)
+    return mean_or, ci, pvals
 
-##########################################################
-#### Stratified analysis 1 - three biomarker subtypes ####
-##########################################################
+##############################################################################
+#### Stratified analysis for pCR and positive response (RCB category 0-1) ####
+##############################################################################
 
-#### A. Chi-squared/Fisher's exact test ####
-for bm_cat in ['ER/PR+ HER2-', 'Triple Negative', 'HER2+']:
-    crosstab = pd.crosstab(
-        data.iloc[data.biomarker_subtypes.values==bm_cat,:].rcb_category.map(dd['response_nat']['Choices, Calculations, OR Slider Labels']),
-        data.iloc[data.biomarker_subtypes.values==bm_cat,:].parity_category
-    )[['Nulliparous', '<5 years', '5-10 years', '>=10 years']]
-    # stattab = pd.concat((
-    #     pd.DataFrame(crosstab.loc[['0','1']].sum(axis=0), columns=['Positive']).transpose(),
-    #     pd.DataFrame(crosstab.loc[['2','3']].sum(axis=0), columns=['Negative']).transpose()
-    # ))
-    stattab = crosstab.drop('Unknown', axis=0)
-    stattab.columns.name = None # remove column label for clarity 
-    fn_bm_cat = re.sub(r"\s|[^A-Za-z]+", "_", bm_cat).lower()
-    pd.DataFrame(
-        np.array([chisquare(stattab).statistic, chisquare(stattab).pvalue]), 
-        index=['chi-stat', 'p'], 
-        columns=stattab.columns
-    ).to_csv(f'{dn}/{outdir}/{datestring}_chi_test_biomarksub_{fn_bm_cat}.csv')
-
-#### B. Odds-ratio and confidence intervals calculated via logistic regression ####
-record_ors = pd.DataFrame(
-    None, 
-    index=['<5 years', '5-10 years', '>=10 years'],
-    columns=['ER/PR+ HER2-', 'Triple Negative', 'HER2+']
-)
+results = {
+    'ER/PR+ HER2-' : {
+        'pCR' : pd.DataFrame(index=['parity', 'recency (thres=5)', 'recency (thres=10)'],columns=['varname', 'or', 'low', 'high', 'formatted', 'p-value']),
+        'positive' : pd.DataFrame(index=['parity', 'recency (thres=5)', 'recency (thres=10)'],columns=['varname', 'or', 'low', 'high', 'formatted', 'p-value']),
+    }, 
+    'Triple Negative' : {
+        'pCR' : pd.DataFrame(index=['parity', 'recency (thres=5)', 'recency (thres=10)'],columns=['varname', 'or', 'low', 'high', 'formatted', 'p-value']),
+        'positive' : pd.DataFrame(index=['parity', 'recency (thres=5)', 'recency (thres=10)'],columns=['varname', 'or', 'low', 'high', 'formatted', 'p-value']),
+    }, 
+    'HER2+' : {
+        'pCR' : pd.DataFrame(index=['parity', 'recency (thres=5)', 'recency (thres=10)'],columns=['varname', 'or', 'low', 'high', 'formatted', 'p-value']),
+        'positive' : pd.DataFrame(index=['parity', 'recency (thres=5)', 'recency (thres=10)'],columns=['varname', 'or', 'low', 'high', 'formatted', 'p-value']),
+    },
+}
 
 for bm_cat in ['ER/PR+ HER2-', 'Triple Negative', 'HER2+']:
-    sub_data = data.iloc[data.biomarker_subtypes.values==bm_cat,:]
-    for par_query in ['<5 years', '5-10 years', '>=10 years']: # parity query category 
-        X = sub_data.iloc[
-            ((sub_data.parity_category.values=='Nulliparous') | (sub_data.parity_category.values==par_query))
-        ].parity_category.map(
-            {'Nulliparous' : 0, par_query : 1}
-        ).to_numpy().reshape(-1,1)
-        y = sub_data.iloc[
-            ((sub_data.parity_category.values=='Nulliparous') | (sub_data.parity_category.values==par_query))
-        ].rcb_category.map(dd['response_nat']['Choices, Calculations, OR Slider Labels']).map(
-            {'No residual disease' : 1, 'Residual disease' : 0, 'Unknown' : 0}
-        ).fillna(0).to_numpy()
-        # perform LR analysis 
-        or_mean, ci = get_oddsratio_ci(X, y)
-        record_ors.loc[par_query, bm_cat] = f'{or_mean[0]:.4f} (95% CI {ci[0][0]:.4f}-{ci[0][1]:.4f})'
+    for outcome in ['pCR', 'positive']:
+        subdata = data.iloc[data.biomarker_subtypes.values==bm_cat,:]
+        X_np, y_np, X_rec, y_rec = generate_lrdata(subdata, feature_name=outcome, recency_thres=5)
+        if ((np.sum((X_np[:,0]==0) & (y_np==1))==0) | (np.sum((X_np[:,0]==1) & (y_np==1))==0)):
+            print('# Cannot perform parous vs. nulliparous comparison due to lack of mutation carriers\n')
+        else:
+            try:
+                X_np_nonan = np.delete(X_np, np.where(np.isnan(X_np))[0], axis=0)
+                y_np_nonan = np.delete(y_np, np.where(np.isnan(X_np))[0])
+                oddsratios, cis, pvals = get_oddsratio_ci(X_np_nonan, y_np_nonan)
+                results[bm_cat][outcome].loc['parity','varname'] = 'parity'
+                results[bm_cat][outcome].loc['parity','or'] = oddsratios[0]
+                results[bm_cat][outcome].loc['parity','low'] = cis[0][0]
+                results[bm_cat][outcome].loc['parity','high'] = cis[0][1]
+                results[bm_cat][outcome].loc['parity','formatted'] = f'{oddsratios[0]:.2f} ({cis[0][0]:.2f}-{cis[0][1]:.2f})'
+                results[bm_cat][outcome].loc['parity','p-value'] = pvals[0]
+                # print('\n#### parous vs nulliparous ####')
+                # print(f'Odds ratio for parity: {oddsratios[0]:.4f} (95% CIs {cis[0][0]:.4f}-{cis[0][1]:.4f})')
+                # print(f'Odds ratio for age: {oddsratios[1]:.4f} (95% CIs {cis[1][0]:.4f}-{cis[1][1]:.4f})\n')
+            except:
+                print(f'Could not calculate odds ratio for {bm_cat} and {outcome}.\n')
+        #
+        if ((np.sum((X_rec[:,0]==0) & (y_rec==1))==0) | (np.sum((X_rec[:,0]==1) & (y_rec==1))==0)):
+            print('# Cannot perform recent vs. non-recent comparison with 5-year cutoff due to lack of data\n')
+        else:
+            try:
+                X_rec_nonan=np.delete(X_rec, np.where(np.isnan(X_rec))[0], axis=0)
+                y_rec_nonan=np.delete(y_rec, np.where(np.isnan(X_rec))[0])
+                oddsratios, cis, pvals = get_oddsratio_ci(X_rec_nonan, y_rec_nonan)
+                results[bm_cat][outcome].loc['recency (thres=5)','varname'] = 'recency (thres=5)'
+                results[bm_cat][outcome].loc['recency (thres=5)','or'] = oddsratios[0]
+                results[bm_cat][outcome].loc['recency (thres=5)','low'] = cis[0][0]
+                results[bm_cat][outcome].loc['recency (thres=5)','high'] = cis[0][1]
+                results[bm_cat][outcome].loc['recency (thres=5)','formatted'] = f'{oddsratios[0]:.2f} ({cis[0][0]:.2f}-{cis[0][1]:.2f})'
+                results[bm_cat][outcome].loc['recency (thres=5)','p-value'] = pvals[0]
+                # print('\n#### recent vs non-recent (recency threshold 10 years) ####')
+                # print(f'Odds ratio for recency: {oddsratios[0]:.4f} (95% CIs {cis[0][0]:.4f}-{cis[0][1]:.4f})')
+                # print(f'Odds ratio for age: {oddsratios[1]:.4f} (95% CIs {cis[1][0]:.4f}-{cis[1][1]:.4f})\n')
+            except:
+                print(f'Could not calculate odds ratio for {bm_cat} and {outcome}.\n')
+        # 
+        X_np, y_np, X_rec, y_rec = generate_lrdata(subdata, feature_name=outcome, recency_thres=10)
+        # if np.all(y_rec==0):
+        if ((np.sum((X_rec[:,0]==0) & (y_rec==1))==0) | (np.sum((X_rec[:,0]==1) & (y_rec==1))==0)):
+            print('# Cannot perform recent vs. non-recent comparison with 10-year cutoff due to lack of data\n')
+        else:
+            try:
+                X_rec_nonan=np.delete(X_rec, np.where(np.isnan(X_rec))[0], axis=0)
+                y_rec_nonan=np.delete(y_rec, np.where(np.isnan(X_rec))[0])
+                oddsratios, cis, pvals = get_oddsratio_ci(X_rec_nonan, y_rec_nonan)
+                results[bm_cat][outcome].loc['recency (thres=10)','varname'] = 'recency (thres=10)'
+                results[bm_cat][outcome].loc['recency (thres=10)','or'] = oddsratios[0]
+                results[bm_cat][outcome].loc['recency (thres=10)','low'] = cis[0][0]
+                results[bm_cat][outcome].loc['recency (thres=10)','high'] = cis[0][1]
+                results[bm_cat][outcome].loc['recency (thres=10)','formatted'] = f'{oddsratios[0]:.2f} ({cis[0][0]:.2f}-{cis[0][1]:.2f})'
+                results[bm_cat][outcome].loc['recency (thres=10)','p-value'] = pvals[0]
+                # print('\n#### recent vs non-recent (recency threshold 5 years) ####')
+                # print(f'Odds ratio for recency: {oddsratios[0]:.4f} (95% CIs {cis[0][0]:.4f}-{cis[0][1]:.4f})')
+                # print(f'Odds ratio for age: {oddsratios[1]:.4f} (95% CIs {cis[1][0]:.4f}-{cis[1][1]:.4f})\n')
+            except:
+                print(f'Could not calculate odds ratio for {bm_cat} and {outcome}.\n')
 
-record_ors.to_csv(f'{dn}/{outdir}/{datestring}_logistic_oddsratio_biomarkercategory.csv', index=True)
+datestring = datetime.now().strftime("%Y%m%d")
 
-#### C. t-test comparing RCB score ####
-record_t = pd.DataFrame(
-    None, 
-    index=['parity', 'recency (thres=5)', 'recency (thres=10)'],
-    columns=['ER/PR+ HER2-', 'Triple Negative', 'HER2+']
-)
+results['ER/PR+ HER2-']['pCR'].to_csv(f'{dout}/{datestring}_nat_erpr_pCR.csv')
+results['ER/PR+ HER2-']['positive'].to_csv(f'{dout}/{datestring}_nat_erpr_positive_response.csv')
+results['HER2+']['pCR'].to_csv(f'{dout}/{datestring}_nat_her2_pCR.csv')
+results['HER2+']['positive'].to_csv(f'{dout}/{datestring}_nat_her2_positive_response.csv')
+results['Triple Negative']['pCR'].to_csv(f'{dout}/{datestring}_nat_TN_pCR.csv')
+results['Triple Negative']['positive'].to_csv(f'{dout}/{datestring}_nat_TN_positive_response.csv')
 
+#############################
+#### t-test of RCB score ####
+#############################
+
+print('\n## Parous vs. Nulliparous Comparison ##')
+# Non-stratified 
+t, p = ttest_ind(data.rcb.iloc[data.parous.values==1], data.rcb.iloc[data.parous.values==0])
+print(f'Overall: t={t:.2f} (p={p:.4f})')
+
+# Stratified 
 for bm_cat in ['ER/PR+ HER2-', 'Triple Negative', 'HER2+']:
-    ## Parous vs. Nulliparous 
-    parous = data.iloc[data.biomarker_subtypes.values==bm_cat,:].parous
+    subdata = data.iloc[data.biomarker_subtypes.values==bm_cat,:]
+    t, p = ttest_ind(subdata.rcb.iloc[subdata.parous.values==1], subdata.rcb.iloc[subdata.parous.values==0])
+    print(f'{bm_cat}: t={t:.2f} (p={p:.4f})')
+
+print('\n\n## Recent Parity vs. Non-Recent Parity Comparison ##')
+for thres in [5,10]:
+    print(f'\n# {thres}-year recency threshold')
     t, p = ttest_ind(
-        data.iloc[data.biomarker_subtypes.values==bm_cat,:].rcb.iloc[parous.values==1].values,
-        data.iloc[data.biomarker_subtypes.values==bm_cat,:].rcb.iloc[parous.values==0].values,
-        nan_policy='omit'
+        data.rcb.iloc[data.years_since_pregnancy.values<thres], 
+        data.rcb.iloc[data.years_since_pregnancy.values>=thres]
     )
-    record_t.loc['parity', bm_cat] = f'{t:.4f} (p={p:.6f})'
-    ## Recency 
-    for thres in [5,10]:
-        recent = data.iloc[((data.parous.values==1) & (data.biomarker_subtypes.values==bm_cat)),:].years_since_pregnancy < thres
+    print(f'Overall: t={t:.2f} (p={p:.4f})')
+    # Stratified 
+    for bm_cat in ['ER/PR+ HER2-', 'Triple Negative', 'HER2+']:
+        subdata = data.iloc[data.biomarker_subtypes.values==bm_cat,:]
         t, p = ttest_ind(
-            data.iloc[((data.parous.values==1) & (data.biomarker_subtypes.values==bm_cat)),:].rcb.iloc[recent.values],
-            data.iloc[((data.parous.values==1) & (data.biomarker_subtypes.values==bm_cat)),:].rcb.iloc[recent.values],
-            nan_policy='omit'
+            subdata.rcb.iloc[subdata.years_since_pregnancy.values<thres], 
+            subdata.rcb.iloc[subdata.years_since_pregnancy.values>=thres]
         )
-        record_t.loc[f'recency (thres={thres})', bm_cat] = f'{t:.4f} (p={p:.6f})'
-
-record_t.to_csv(f'{dn}/{outdir}/{datestring}_t_test_biomarkercategory.csv')
-
-#########################################################
-#### Stratified analysis 2 - ER/PR positive vs. rest ####
-#########################################################
-
-#### A. Chi-squared/Fisher's exact test ####
-record_chi = pd.DataFrame(
-    None, 
-    index=['<5 years', '5-10 years', '>=10 years'],
-    columns=['ER/PR+', 'ER/PR-']
-)
-
-for erpr_cat in ['ER/PR+', 'ER/PR-']:
-    crosstab = pd.crosstab(
-        data.iloc[data.er_pr.values==erpr_cat,:].rcb_category.map(dd['response_nat']['Choices, Calculations, OR Slider Labels']),
-        data.iloc[data.er_pr.values==erpr_cat,:].parity_category
-    )[['Nulliparous', '<5 years', '5-10 years', '>=10 years']]
-    # stattab = pd.concat((
-    #     pd.DataFrame(crosstab.loc[['0','1']].sum(axis=0), columns=['Positive']).transpose(),
-    #     pd.DataFrame(crosstab.loc[['2','3']].sum(axis=0), columns=['Negative']).transpose()
-    # ))
-    stattab = crosstab.drop('Unknown', axis=0)
-    stattab.columns.name = None # remove column label for clarity 
-    if '+' in erpr_cat:
-        fn_bm_cat = 'pos'
-    elif '-' in erpr_cat:
-        fn_bm_cat = 'neg'
-    #
-    for par_query in ['<5 years', '5-10 years', '>=10 years']:
-        f_obs = stattab.loc[:,['Nulliparous', par_query]]
-        f_exp = np.array([f_obs.sum(axis=0)/2, f_obs.sum(axis=0)/2])
-        chi, p = chisquare(f_obs=f_obs, f_exp=f_exp, axis=None)
-        record_chi.loc[par_query, erpr_cat] = f'{chi:.2f} (p={p:.6f})'
-
-record_chi.to_csv(f'{dn}/{outdir}/{datestring}_chi_test_erpr.csv')
-
-#### B. Odds-ratio and confidence intervals calculated via logistic regression ####
-record_ors = pd.DataFrame(
-    None, 
-    index=['<5 years', '5-10 years', '>=10 years'],
-    columns=['ER/PR+', 'ER/PR-']
-)
-
-for erpr_cat in ['ER/PR+', 'ER/PR-']:
-    sub_data = data.iloc[data.er_pr.values==erpr_cat,:]
-    for par_query in ['<5 years', '5-10 years', '>=10 years']: # parity query category 
-        X = sub_data.iloc[
-            ((sub_data.parity_category.values=='Nulliparous') | (sub_data.parity_category.values==par_query))
-        ].parity_category.map(
-            {'Nulliparous' : 0, par_query : 1}
-        ).to_numpy().reshape(-1,1)
-        y = sub_data.iloc[
-            ((sub_data.parity_category.values=='Nulliparous') | (sub_data.parity_category.values==par_query))
-        ].rcb_category.map(dd['response_nat']['Choices, Calculations, OR Slider Labels']).map(
-            {'No residual disease' : 1, 'Residual disease' : 0, 'Unknown' : 0}
-        ).fillna(0).to_numpy()
-        # perform LR analysis 
-        or_mean, ci = get_oddsratio_ci(X, y)
-        record_ors.loc[par_query, erpr_cat] = f'{or_mean[0]:.4f} (95% CI {ci[0][0]:.4f}-{ci[0][1]:.4f})'
-
-record_ors.to_csv(f'{dn}/{outdir}/{datestring}_logistic_oddsratio_erpr_category.csv', index=True)
-
-#### C. t-test comparing RCB score ####
-record_t = pd.DataFrame(
-    None, 
-    index=['parity', 'recency (thres=5)', 'recency (thres=10)'],
-    columns=['ER/PR+', 'ER/PR-']
-)
-
-for erpr_cat in ['ER/PR+', 'ER/PR-']:
-    ## Parous vs. Nulliparous 
-    parous = data.iloc[data.er_pr.values==erpr_cat,:].parous
-    t, p = ttest_ind(
-        data.iloc[data.er_pr.values==erpr_cat,:].rcb.iloc[parous.values==1].values,
-        data.iloc[data.er_pr.values==erpr_cat,:].rcb.iloc[parous.values==0].values,
-        nan_policy='omit'
-    )
-    record_t.loc['parity', erpr_cat] = f'{t:.4f} (p={p:.6f})'
-    ## Recency 
-    for thres in [5,10]:
-        recent = data.iloc[((data.parous.values==1) & (data.er_pr.values==erpr_cat)),:].years_since_pregnancy < thres
-        t, p = ttest_ind(
-            data.iloc[((data.parous.values==1) & (data.er_pr.values==erpr_cat)),:].rcb.iloc[recent.values],
-            data.iloc[((data.parous.values==1) & (data.er_pr.values==erpr_cat)),:].rcb.iloc[recent.values],
-            nan_policy='omit'
-        )
-        record_t.loc[f'recency (thres={thres})', erpr_cat] = f'{t:.4f} (p={p:.6f})'
-
-record_t.to_csv(f'{dn}/{outdir}/{datestring}_t_test_erpr_category.csv')
+        print(f'{bm_cat}: t={t:.2f} (p={p:.4f})')

@@ -13,7 +13,7 @@ dout = '/share/fsmresfiles/breast_cancer_pregnancy/stat_results'
 #### Read and lightly process data ####
 #######################################
 
-data = pd.read_csv(f'{din}/FrequencyAndResultsO_DATA_2023-03-07_1051.csv')
+data = pd.read_csv(f'{din}/FrequencyAndResultsO_DATA_2023-03-17_0949.csv')
 
 # remove exluded patients
 data = data.iloc[(data.exclude_demo.values!=1) & (data.exclude_tum.values!=1),:]
@@ -70,38 +70,26 @@ def get_oddsratio_ci(X, y, alpha=0.95, rep=5000):
             or3.append(np.exp(lrm.coef_[0][2]))
         else:
             continue
-    oddsratio = (np.mean(or1), np.mean(or2), np.mean(or3))
-    ci = ()
+    oddsratios = [np.mean(or1), np.mean(or2), np.mean(or3)]
     # first get ci1
-    p = ((1.0-alpha)/2.0) * 100
-    lower = max(0.0, np.percentile(or1, p))
-    p = (alpha+((1.0-alpha)/2.0)) * 100
-    upper = np.percentile(or1, p)
-    ci1 = (lower, upper)
-    # next get ci2
-    p = ((1.0-alpha)/2.0) * 100
-    lower = max(0.0, np.percentile(or2, p))
-    p = (alpha+((1.0-alpha)/2.0)) * 100
-    upper = np.percentile(or2, p)
-    ci2 = (lower, upper)
-    # finally get ci3
-    p = ((1.0-alpha)/2.0) * 100
-    lower = max(0.0, np.percentile(or3, p))
-    p = (alpha+((1.0-alpha)/2.0)) * 100
-    upper = np.percentile(or3, p)
-    ci3 = (lower, upper)
-    # combine all
-    ci = (ci1, ci2, ci3)
-    return oddsratio, ci
+    ci_lower = ((1.0-alpha)/2.0) * 100
+    ci_higher = (alpha+((1.0-alpha)/2.0)) * 100
+    ci, pvals = [], []
+    for bs_sample in [or1, or2, or3]:
+        lower = max(0.0, np.percentile(bs_sample, ci_lower))
+        upper = np.percentile(bs_sample, ci_higher)
+        ci.append((lower, upper))
+        pvals.append(np.min([(np.array(bs_sample)<1).mean(), (np.array(bs_sample)>1).mean()])*2)
+    return oddsratios, ci, pvals
 
 
 ##########################
 #### Perform Analysis ####
 ##########################
 
-results_parity = pd.DataFrame(index=genes, columns=['varname', 'or', 'low', 'high'])
-results_recency10 = pd.DataFrame(index=genes, columns=['varname', 'or', 'low', 'high'])
-results_recency5 = pd.DataFrame(index=genes, columns=['varname', 'or', 'low', 'high'])
+results_parity = pd.DataFrame(index=genes, columns=['varname', 'or', 'low', 'high', 'formatted', 'p-value'])
+results_recency10 = pd.DataFrame(index=genes, columns=['varname', 'or', 'low', 'high', 'formatted', 'p-value'])
+results_recency5 = pd.DataFrame(index=genes, columns=['varname', 'or', 'low', 'high', 'formatted', 'p-value'])
 
 for gene in genes:
     print(f'######## Results for {gene} ########')
@@ -114,16 +102,18 @@ for gene in genes:
         try:
             X_np_nonan = np.delete(X_np, np.where(np.isnan(X_np))[0], axis=0)
             y_np_nonan = np.delete(y_np, np.where(np.isnan(X_np))[0])
-            oddsratios, cis = get_oddsratio_ci(X_np_nonan, y_np_nonan)
+            oddsratios, cis, pvals = get_oddsratio_ci(X_np_nonan, y_np_nonan)
             results_parity.loc[gene,'varname'] = gene
             results_parity.loc[gene,'or'] = oddsratios[0]
             results_parity.loc[gene,'low'] = cis[0][0]
             results_parity.loc[gene,'high'] = cis[0][1]
+            results_parity.loc[gene,'formatted'] = f'{oddsratios[0]:.2f} ({cis[0][0]:.2f}-{cis[0][1]:.2f})'
+            results_parity.loc[gene,'p-value'] = pvals[0]
             # print('\n#### parous vs nulliparous ####')
             # print(f'Odds ratio for parity: {oddsratios[0]:.4f} (95% CIs {cis[0][0]:.4f}-{cis[0][1]:.4f})')
             # print(f'Odds ratio for age: {oddsratios[1]:.4f} (95% CIs {cis[1][0]:.4f}-{cis[1][1]:.4f})\n')
         except:
-            print('Could not calculate odds ratio.\n')
+            print(f'Could not calculate odds ratio for {gene} in parous vs. nulliparous.\n')
     # 
     # if np.all(y_rec==0):
     if ((np.sum((X_np[:,0]==0) & (y_np==1))==0) | (np.sum((X_np[:,0]==1) & (y_np==1))==0)):
@@ -132,16 +122,18 @@ for gene in genes:
         try:
             X_rec_nonan=np.delete(X_rec, np.where(np.isnan(X_rec))[0], axis=0)
             y_rec_nonan=np.delete(y_rec, np.where(np.isnan(X_rec))[0])
-            oddsratios, cis = get_oddsratio_ci(X_rec_nonan, y_rec_nonan)
+            oddsratios, cis, pvals = get_oddsratio_ci(X_rec_nonan, y_rec_nonan)
             results_recency10.loc[gene,'varname'] = gene
             results_recency10.loc[gene,'or'] = oddsratios[0]
             results_recency10.loc[gene,'low'] = cis[0][0]
             results_recency10.loc[gene,'high'] = cis[0][1]
+            results_recency10.loc[gene,'formatted'] = f'{oddsratios[0]:.2f} ({cis[0][0]:.2f}-{cis[0][1]:.2f})'
+            results_recency10.loc[gene,'p-value'] = pvals[0]
             # print('\n#### recent vs non-recent (recency threshold 10 years) ####')
             # print(f'Odds ratio for recency: {oddsratios[0]:.4f} (95% CIs {cis[0][0]:.4f}-{cis[0][1]:.4f})')
             # print(f'Odds ratio for age: {oddsratios[1]:.4f} (95% CIs {cis[1][0]:.4f}-{cis[1][1]:.4f})\n')
         except:
-            print('Could not calculate odds ratio.\n')
+            print(f'Could not calculate odds ratio for {gene} in recency (10 years).\n')
     # 
     X_np, y_np, X_rec, y_rec = generate_lrdata(data, genelist=[gene], recency_thres=5)
     # if np.all(y_rec==0):
@@ -151,16 +143,18 @@ for gene in genes:
         try:
             X_rec_nonan=np.delete(X_rec, np.where(np.isnan(X_rec))[0], axis=0)
             y_rec_nonan=np.delete(y_rec, np.where(np.isnan(X_rec))[0])
-            oddsratios, cis = get_oddsratio_ci(X_rec_nonan, y_rec_nonan)
+            oddsratios, cis, pvals = get_oddsratio_ci(X_rec_nonan, y_rec_nonan)
             results_recency5.loc[gene,'varname'] = gene
             results_recency5.loc[gene,'or'] = oddsratios[0]
             results_recency5.loc[gene,'low'] = cis[0][0]
             results_recency5.loc[gene,'high'] = cis[0][1]
+            results_recency5.loc[gene,'formatted'] = f'{oddsratios[0]:.2f} ({cis[0][0]:.2f}-{cis[0][1]:.2f})'
+            results_recency5.loc[gene,'p-value'] = pvals[0]
             # print('\n#### recent vs non-recent (recency threshold 5 years) ####')
             # print(f'Odds ratio for recency: {oddsratios[0]:.4f} (95% CIs {cis[0][0]:.4f}-{cis[0][1]:.4f})')
             # print(f'Odds ratio for age: {oddsratios[1]:.4f} (95% CIs {cis[1][0]:.4f}-{cis[1][1]:.4f})\n')
         except:
-            print('Could not calculate odds ratio.\n')
+            print(f'Could not calculate odds ratio for {gene} in recency (5 years).\n')
 
 datestring = datetime.now().strftime("%Y%m%d")
 
