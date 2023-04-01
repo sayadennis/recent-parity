@@ -48,6 +48,8 @@ data['biomarker_subtypes'] = None
 data['er_pr_positive'] = None
 data['her2_positive'] = None
 data['triple_negative'] = None
+data['grade_severe_3'] = (data['histologic_grade'].map(dd['histologic_grade']['Choices, Calculations, OR Slider Labels'])=='3').astype(int)
+data['grade_severe_2or3'] = ((data['histologic_grade'].map(dd['histologic_grade']['Choices, Calculations, OR Slider Labels'])=='3') | (data['histologic_grade'].map(dd['histologic_grade']['Choices, Calculations, OR Slider Labels'])=='2')).astype(int)
 
 missing_ix = []
 for i in data.index:
@@ -123,7 +125,7 @@ for i, parity_category in enumerate(crosstab.columns):
 #### Assess the associations between tumor and parity ####
 ##########################################################
 
-feature_names=['her2_positive', 'triple_negative', 'er_pr_positive']
+feature_names=['her2_positive', 'triple_negative', 'er_pr_positive', 'grade_severe_3', 'grade_severe_2or3']
 
 def generate_lrdata(df, feature_name, recency_thres=10):
     lrdata = pd.DataFrame(None, index=None, columns=['parous', feature_name, 'recent', 'age', 'fam_hx'])
@@ -191,11 +193,13 @@ for feature_name in feature_names:
         try:
             X_np_nonan = np.delete(X_np, np.where(np.isnan(X_np))[0], axis=0)
             y_np_nonan = np.delete(y_np, np.where(np.isnan(X_np))[0])
-            oddsratios, cis = get_oddsratio_ci(X_np_nonan, y_np_nonan)
+            oddsratios, cis, pvals = get_oddsratio_ci(X_np_nonan, y_np_nonan)
             results_parity.loc[feature_name,'varname'] = feature_name
             results_parity.loc[feature_name,'or'] = oddsratios[0]
             results_parity.loc[feature_name,'low'] = cis[0][0]
             results_parity.loc[feature_name,'high'] = cis[0][1]
+            results_parity.loc[feature_name,'formatted'] = f'{oddsratios[0]} ({cis[0][0]}-{cis[0][1]})'
+            results_parity.loc[feature_name,'pval'] = pvals[0]
             # print('\n#### parous vs nulliparous ####')
             # print(f'Odds ratio for parity: {oddsratios[0]:.4f} (95% CIs {cis[0][0]:.4f}-{cis[0][1]:.4f})')
             # print(f'Odds ratio for age: {oddsratios[1]:.4f} (95% CIs {cis[1][0]:.4f}-{cis[1][1]:.4f})\n')
@@ -209,11 +213,13 @@ for feature_name in feature_names:
         try:
             X_rec_nonan=np.delete(X_rec, np.where(np.isnan(X_rec))[0], axis=0)
             y_rec_nonan=np.delete(y_rec, np.where(np.isnan(X_rec))[0])
-            oddsratios, cis = get_oddsratio_ci(X_rec_nonan, y_rec_nonan)
+            oddsratios, cis, pvals = get_oddsratio_ci(X_rec_nonan, y_rec_nonan)
             results_recency10.loc[feature_name,'varname'] = feature_name
             results_recency10.loc[feature_name,'or'] = oddsratios[0]
             results_recency10.loc[feature_name,'low'] = cis[0][0]
             results_recency10.loc[feature_name,'high'] = cis[0][1]
+            results_recency10.loc[feature_name,'formatted'] = f'{oddsratios[0]} ({cis[0][0]}-{cis[0][1]})'
+            results_recency10.loc[feature_name,'pval'] = pvals[0]
             # print('\n#### recent vs non-recent (recency threshold 10 years) ####')
             # print(f'Odds ratio for recency: {oddsratios[0]:.4f} (95% CIs {cis[0][0]:.4f}-{cis[0][1]:.4f})')
             # print(f'Odds ratio for age: {oddsratios[1]:.4f} (95% CIs {cis[1][0]:.4f}-{cis[1][1]:.4f})\n')
@@ -228,11 +234,13 @@ for feature_name in feature_names:
         try:
             X_rec_nonan=np.delete(X_rec, np.where(np.isnan(X_rec))[0], axis=0)
             y_rec_nonan=np.delete(y_rec, np.where(np.isnan(X_rec))[0])
-            oddsratios, cis = get_oddsratio_ci(X_rec_nonan, y_rec_nonan)
+            oddsratios, cis, pvals = get_oddsratio_ci(X_rec_nonan, y_rec_nonan)
             results_recency5.loc[feature_name,'varname'] = feature_name
             results_recency5.loc[feature_name,'or'] = oddsratios[0]
             results_recency5.loc[feature_name,'low'] = cis[0][0]
             results_recency5.loc[feature_name,'high'] = cis[0][1]
+            results_recency5.loc[feature_name,'formatted'] = f'{oddsratios[0]} ({cis[0][0]}-{cis[0][1]})'
+            results_recency5.loc[feature_name,'pval'] = pvals[0]
             # print('\n#### recent vs non-recent (recency threshold 5 years) ####')
             # print(f'Odds ratio for recency: {oddsratios[0]:.4f} (95% CIs {cis[0][0]:.4f}-{cis[0][1]:.4f})')
             # print(f'Odds ratio for age: {oddsratios[1]:.4f} (95% CIs {cis[1][0]:.4f}-{cis[1][1]:.4f})\n')

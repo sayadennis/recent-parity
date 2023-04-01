@@ -178,7 +178,7 @@ def get_tumor_char(notestring):
         'TNM'                                       : find_and_slice(staging_sum, begin='TNM Staging:', end=r',|Grading of invasive carcinoma is based on|Labs:|Final Diagnosis|BREAST CANCER TUMOR MARKERS FOR INVASIVE CARCINOMA:|Past Medical History:|[0-9][0-9]?/[0-9][0-9]?/[0-9][0-9]|Oncotype|PMH/PSH:|SUBJECTIVE:|ASSESSMENT:|IMPRESSION AND RECOMMENDATION:|ASSESSMENT/PLAN:|MX PE:|A/P:|Procedures'),
         'Oncotype RS'                               : find_and_slice(staging_sum, begin=r'Oncotype RS|Oncotype testing', end='Impression and Plan'),
         'Diagnosis'                                 : find_and_slice(staging_sum, begin=r'Joint Commission on Cancer \(AJCC, 7th Edition, 2010\). Diagnosis|Final Diagnosis', end=r'Impression and Plan|IMPRESSION AND RECOMMENDATION:|ASSESSMENT/PLAN:|IMPRESSION:'),
-        'Impression and Plan'                       : find_and_slice(staging_sum, begin=r'Impression and Plan|IMPRESSION AND RECOMMENDATION:|ASSESSMENT/PLAN:|IMPRESSION:', end='Seen and discussed with')
+        'Impression and Plan'                       : find_and_slice(staging_sum, begin=r'Impression and Plan|IMPRESSION AND RECOMMENDATION:|ASSESSMENT/PLAN:|IMPRESSION:', end='Seen and discussed with'),
         'Genetic Testing'                           : find_and_slice(notestring, begin=r'Genetic testing:', end=r'Ashkenazi Jewish heritage:|Time since diagnosis:|TREATMENT SIDE EFFECTS:|Labs:')
     }
     return tum_char_dict
