@@ -37,25 +37,30 @@ for i in data.index:
 
 ## Fill in biomarker subtypes 
 data['biomarker_subtypes'] = None
-missing_ix = []
 for i in data.index:
     try:
         er = dd['er_status']['Choices, Calculations, OR Slider Labels'][data.loc[i,'er_status']]=='Positive'
+    except:
+        er = np.nan
+    try:
         pr = dd['pr_status']['Choices, Calculations, OR Slider Labels'][data.loc[i,'pr_status']]=='Positive'
     except:
-        er = False
-        pr = False
-        if not i in missing_ix:
-            missing_ix.append(i)
+        pr = np.nan
     if not pd.isnull(data.loc[i,'her2_status']):
         her2 = dd['her2_status']['Choices, Calculations, OR Slider Labels'][data.loc[i,'her2_status']]=='Positive'
     else:
-        her2 = False
-        if not i in missing_ix:
-            missing_ix.append(i)
-    if ((er | pr) & (not her2)):
+        her2 = np.nan
+    # 
+    if ((er==True) | (pr==True)):
+        erpr = True
+    else:
+        erpr = False
+    #
+    if (np.all(np.isnan([er, pr])) | np.isnan(her2)):
+        data.loc[i,'biomarker_subtypes'] = None
+    elif ((erpr) & (not her2)):
         data.loc[i,'biomarker_subtypes'] = 'ER/PR+ HER2-'
-    elif ((not er) & (not pr) & (not her2)):
+    elif ((not erpr) & (not her2)):
         data.loc[i,'biomarker_subtypes'] = 'Triple Negative'
     elif her2:
         data.loc[i,'biomarker_subtypes'] = 'HER2+'
@@ -66,13 +71,16 @@ data['er_pr'] = None
 for i in data.index:
     try:
         er = dd['er_status']['Choices, Calculations, OR Slider Labels'][data.loc[i,'er_status']]=='Positive'
+    except:
+        er = np.nan
+    try:
         pr = dd['pr_status']['Choices, Calculations, OR Slider Labels'][data.loc[i,'pr_status']]=='Positive'
     except:
-        er = False
-        pr = False
-        print('Missing ER/PR at index:', i)
-    if (er | pr):
+        pr = np.nan
+    if ((er==True) | (pr==True)):
         data.loc[i,'er_pr'] = 'ER/PR+'
+    elif np.all(np.isnan([er, pr])):
+        data.loc[i,'er_pr'] = None
     else:
         data.loc[i,'er_pr'] = 'ER/PR-'
 
@@ -173,6 +181,11 @@ main_table['Overall'] = main_table[
     ['Nulliparous', '<5 years', '5-10 years', '>=10 years']
 ].sum(axis=1).astype(int)
 
+for i in main_table.index:
+    for j in ['Nulliparous', '<5 years', '5-10 years', '>=10 years']:
+        percentage = 100*main_table.loc[i,j]/main_table.loc[i,'Overall']
+        main_table.loc[i,j] = f'{main_table.loc[i,j]} ({percentage:.1f}%)'
+
 main_table['super_category'] = 'genetic'
 main_table['main_category'] = main_table.index
 main_table.reset_index(drop=True, inplace=True)
@@ -191,13 +204,47 @@ main_table = pd.DataFrame(
 )
 
 for colname in ['biomarker_subtypes', 'histology', 'histologic_grade', 'tumor_staging_category', 'node_staging_category']: # 'clin_tumor_stag_cat', 'clin_node_stag_cat'
-    if colname!='biomarker_subtypes':
+    if colname=='histologic_grade':
+        grade_converted_value = None # initialize variable
+        for i in data.index:
+            is_dcis = dd['histology']['Choices, Calculations, OR Slider Labels'][int(data.loc[i,'histology'])]=='DCIS' if not pd.isnull(data.loc[i,'histology']) else False
+            is_missing = pd.isnull(data.loc[i,'histologic_grade'])
+            if not is_missing:
+                grade_converted_value = dd[colname]['Choices, Calculations, OR Slider Labels'][int(data.loc[i,'histologic_grade'])]
+            else:
+                grade_converted_value = None
+            # 
+            if is_dcis:
+                data.loc[i,'histologic_grade'] = 'No histologic grade (DCIS)'
+            elif (is_missing | (grade_converted_value=='No histologic grade (DCIS)')):
+                data.loc[i,'histologic_grade'] = 'missing'
+            else:
+                data.loc[i,'histologic_grade'] = grade_converted_value
+        #
+        subtable = pd.crosstab(data[colname], data['parity_category']).reset_index()
+    elif colname!='biomarker_subtypes':
         subtable = pd.crosstab(data[colname], data['parity_category']).rename(
             dd[colname]['Choices, Calculations, OR Slider Labels'],
             axis=0
         ).reset_index()
+        subtable = pd.concat((
+            subtable,
+            pd.DataFrame(
+                {colname : 'missing'} | 
+                pd.crosstab(pd.isnull(data[colname]).astype(int), data['parity_category']).loc[1,:].to_dict(), 
+                index=[0]
+            )
+        )).reset_index(drop=True)
     else:
         subtable = pd.crosstab(data[colname], data['parity_category']).reset_index()
+        subtable = pd.concat((
+            subtable,
+            pd.DataFrame(
+                {colname : 'missing'} | 
+                pd.crosstab(pd.isnull(data[colname]).astype(int), data['parity_category']).loc[1,:].to_dict(), 
+                index=[0]
+            )
+        )).reset_index(drop=True)
     #
     subtable = subtable.rename({colname : 'sub_category'}, axis=1)
     subtable.columns.name = None
@@ -213,11 +260,18 @@ main_table['Overall'] = main_table[
 
 main_table.reset_index(drop=True, inplace=True)
 
-for i in main_table.index:
-    for par_cat in ['Nulliparous', '<5 years', '5-10 years', '>=10 years']:
-        ct = main_table.loc[i,par_cat]
-        pct = main_table.loc[i,par_cat]/main_table.loc[i,'Overall']*100
-        main_table.loc[i,par_cat] = f'{ct} ({pct:.1f}%)'
+for tumvarcat in main_table.main_category.unique():
+    subtable = main_table.iloc[main_table.main_category.values==tumvarcat,:]
+    totals = subtable.sum(axis=0)
+    cts = subtable[['Nulliparous', '<5 years', '5-10 years', '>=10 years']]
+    cts.index = subtable.sub_category
+    pcts = subtable[['Nulliparous', '<5 years', '5-10 years', '>=10 years']] / totals[['Nulliparous', '<5 years', '5-10 years', '>=10 years']]
+    pcts.index = subtable.sub_category
+    for subcat in subtable.sub_category.values:
+        for par_cat in ['Nulliparous', '<5 years', '5-10 years', '>=10 years']:
+            ct = cts.loc[subcat,par_cat]
+            pct = 100*pcts.loc[subcat,par_cat]
+            main_table.iloc[((main_table.main_category.values==tumvarcat) & (main_table.sub_category.values==subcat)), main_table.columns==par_cat] = f'{ct} ({pct:.1f}%)'
 
 main_table = pd.concat((
     main_table,
