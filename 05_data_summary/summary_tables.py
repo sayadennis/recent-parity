@@ -263,12 +263,12 @@ main_table.reset_index(drop=True, inplace=True)
 for tumvarcat in main_table.main_category.unique():
     subtable = main_table.iloc[main_table.main_category.values==tumvarcat,:]
     totals = subtable.sum(axis=0)
-    cts = subtable[['Nulliparous', '<5 years', '5-10 years', '>=10 years']]
+    cts = subtable[['Nulliparous', '<5 years', '5-10 years', '>=10 years', 'Overall']]
     cts.index = subtable.sub_category
-    pcts = subtable[['Nulliparous', '<5 years', '5-10 years', '>=10 years']] / totals[['Nulliparous', '<5 years', '5-10 years', '>=10 years']]
+    pcts = subtable[['Nulliparous', '<5 years', '5-10 years', '>=10 years', 'Overall']] / totals[['Nulliparous', '<5 years', '5-10 years', '>=10 years', 'Overall']]
     pcts.index = subtable.sub_category
     for subcat in subtable.sub_category.values:
-        for par_cat in ['Nulliparous', '<5 years', '5-10 years', '>=10 years']:
+        for par_cat in ['Nulliparous', '<5 years', '5-10 years', '>=10 years', 'Overall']:
             ct = cts.loc[subcat,par_cat]
             pct = 100*pcts.loc[subcat,par_cat]
             main_table.iloc[((main_table.main_category.values==tumvarcat) & (main_table.sub_category.values==subcat)), main_table.columns==par_cat] = f'{ct} ({pct:.1f}%)'
@@ -335,6 +335,20 @@ main_table['Overall'] = main_table[
 
 main_table['super_category'] = 'treatment'
 main_table.reset_index(drop=True, inplace=True)
+
+for natvarcat in main_table.main_category.unique():
+    subtable = main_table.iloc[main_table.main_category.values==natvarcat,:]
+    totals = subtable.sum(axis=0)
+    cts = subtable[['Nulliparous', '<5 years', '5-10 years', '>=10 years', 'Overall']]
+    cts.index = subtable.sub_category
+    pcts = subtable[['Nulliparous', '<5 years', '5-10 years', '>=10 years', 'Overall']] / totals[['Nulliparous', '<5 years', '5-10 years', '>=10 years', 'Overall']]
+    pcts.index = subtable.sub_category
+    for subcat in subtable.sub_category.values:
+        for par_cat in ['Nulliparous', '<5 years', '5-10 years', '>=10 years', 'Overall']:
+            ct = cts.loc[subcat,par_cat]
+            pct = 100*pcts.loc[subcat,par_cat]
+            main_table.iloc[((main_table.main_category.values==natvarcat) & (main_table.sub_category.values==subcat)), main_table.columns==par_cat] = f'{ct} ({pct:.1f}%)'
+
 
 super_table = pd.concat((
     super_table,
