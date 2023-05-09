@@ -47,6 +47,7 @@ for i in data.index:
 data['biomarker_subtypes'] = None
 data['er_pr_positive'] = None
 data['her2_positive'] = None
+data['her2_or_tn'] = None
 data['triple_negative'] = None
 data['grade_severe_3'] = (data['histologic_grade'].map(dd['histologic_grade']['Choices, Calculations, OR Slider Labels'])=='3').astype(int)
 data['grade_severe_2or3'] = ((data['histologic_grade'].map(dd['histologic_grade']['Choices, Calculations, OR Slider Labels'])=='3') | (data['histologic_grade'].map(dd['histologic_grade']['Choices, Calculations, OR Slider Labels'])=='2')).astype(int)
@@ -94,6 +95,8 @@ for i in data.index:
         else:
             data.loc[i,'her2_positive'] = 0
 
+data['her2_or_tn'] = (data['her2_positive'] | data['triple_negative']).astype(int)
+
 #################################################################
 #### Assess the effects of potentially confounding variables ####
 #################################################################
@@ -125,7 +128,7 @@ for i, parity_category in enumerate(crosstab.columns):
 #### Assess the associations between tumor and parity ####
 ##########################################################
 
-feature_names=['her2_positive', 'triple_negative', 'er_pr_positive', 'grade_severe_3', 'grade_severe_2or3']
+feature_names=['her2_positive', 'triple_negative', 'er_pr_positive', 'her2_or_tn', 'grade_severe_3', 'grade_severe_2or3']
 
 def generate_lrdata(df, feature_name, recency_thres=10):
     lrdata = pd.DataFrame(None, index=None, columns=['parous', feature_name, 'recent', 'age', 'fam_hx'])
@@ -198,7 +201,7 @@ for feature_name in feature_names:
             results_parity.loc[feature_name,'or'] = oddsratios[0]
             results_parity.loc[feature_name,'low'] = cis[0][0]
             results_parity.loc[feature_name,'high'] = cis[0][1]
-            results_parity.loc[feature_name,'formatted'] = f'{oddsratios[0]} ({cis[0][0]}-{cis[0][1]})'
+            results_parity.loc[feature_name,'formatted'] = f'{oddsratios[0]:.2f} ({cis[0][0]:.2f}-{cis[0][1]:.2f})'
             results_parity.loc[feature_name,'pval'] = pvals[0]
             # print('\n#### parous vs nulliparous ####')
             # print(f'Odds ratio for parity: {oddsratios[0]:.4f} (95% CIs {cis[0][0]:.4f}-{cis[0][1]:.4f})')
@@ -218,7 +221,7 @@ for feature_name in feature_names:
             results_recency10.loc[feature_name,'or'] = oddsratios[0]
             results_recency10.loc[feature_name,'low'] = cis[0][0]
             results_recency10.loc[feature_name,'high'] = cis[0][1]
-            results_recency10.loc[feature_name,'formatted'] = f'{oddsratios[0]} ({cis[0][0]}-{cis[0][1]})'
+            results_recency10.loc[feature_name,'formatted'] = f'{oddsratios[0]:.2f} ({cis[0][0]:.2f}-{cis[0][1]:.2f})'
             results_recency10.loc[feature_name,'pval'] = pvals[0]
             # print('\n#### recent vs non-recent (recency threshold 10 years) ####')
             # print(f'Odds ratio for recency: {oddsratios[0]:.4f} (95% CIs {cis[0][0]:.4f}-{cis[0][1]:.4f})')
@@ -239,7 +242,7 @@ for feature_name in feature_names:
             results_recency5.loc[feature_name,'or'] = oddsratios[0]
             results_recency5.loc[feature_name,'low'] = cis[0][0]
             results_recency5.loc[feature_name,'high'] = cis[0][1]
-            results_recency5.loc[feature_name,'formatted'] = f'{oddsratios[0]} ({cis[0][0]}-{cis[0][1]})'
+            results_recency5.loc[feature_name,'formatted'] = f'{oddsratios[0]:.2f} ({cis[0][0]:.2f}-{cis[0][1]:.2f})'
             results_recency5.loc[feature_name,'pval'] = pvals[0]
             # print('\n#### recent vs non-recent (recency threshold 5 years) ####')
             # print(f'Odds ratio for recency: {oddsratios[0]:.4f} (95% CIs {cis[0][0]:.4f}-{cis[0][1]:.4f})')
