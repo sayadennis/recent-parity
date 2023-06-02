@@ -255,3 +255,78 @@ datestring = datetime.now().strftime("%Y%m%d")
 results_parity.to_csv(f'{dout}/{datestring}_tumchar_vs_parity.csv', index=False)
 results_recency10.to_csv(f'{dout}/{datestring}_tumchar_vs_recencyparity10.csv', index=False)
 results_recency5.to_csv(f'{dout}/{datestring}_tumchar_vs_recencyparity5.csv', index=False)
+
+###############################################################
+#### Additional analysis to address Takahiro's suggestions ####
+###############################################################
+
+# * Nullip vs. recently pregnant 
+#     * nulli vs. <5
+#     * nulli vs. <10 
+# * Nullip vs. not recently pregnant 
+#     * nulli vs. 5+
+#     * nulli vs. 10+
+# * varying recency of pregnancy 
+#     * <5 vs. 10+
+
+## Nullip vs. recently parous -- Nullip is the reference category, recently parous is the comparison category 
+for recency_thres in [5, 10]:
+    print(f'>>>> Recency threshold {recency_thres} <<<<')
+    for feature_name in feature_names:
+        lrdata = pd.DataFrame(None, index=None, columns=['comparison_category', feature_name, 'age', 'fam_hx'])
+        for i in range(data.shape[0]):
+            pat_dict = {}
+            if data['parous'].iloc[i]==0:
+                pat_dict['comparison_category'] = 0
+            elif int(data['years_since_pregnancy'].iloc[i] < recency_thres):
+                pat_dict['comparison_category'] = 1
+            else:
+                continue
+            pat_dict[feature_name] = [data[feature_name].iloc[i]]
+            pat_dict['age'] = [data['age_at_diagnosis'].iloc[i]]
+            pat_dict['fam_hx'] = [data['fam_hx'].iloc[i]]
+            if np.any(pd.isnull(list(pat_dict.values()))):
+                continue
+            lrdata = pd.concat((lrdata, pd.DataFrame(pat_dict)), ignore_index=True)
+        # 
+        lrdata = lrdata.dropna(axis=0) # drop rows that contain NA 
+        # 
+        # data for nulliparous vs. parous 
+        X = np.array(lrdata[['comparison_category', 'age', 'fam_hx']], dtype=float)
+        X[:,1] = (X[:,1] - np.mean(X[:,1]))/np.std(X[:,1]) # standard scale
+        y = np.array(lrdata[feature_name], dtype=float)
+        sample_size = X.shape[0]
+        # 
+        oddsratios, cis, pvals = get_oddsratio_ci(X, y)
+        print(f'## {feature_name} (N={sample_size}): OR={oddsratios[0]:.2f} ({cis[0][0]:.2f}-{cis[0][1]:.2f}), p={pvals[0]}')
+
+## Nullip vs. not recently parous -- Nullip is the reference category, not recently parous is the comparison category 
+for recency_thres in [5, 10]:
+    print(f'>>>> Recency threshold {recency_thres} <<<<')
+    for feature_name in feature_names:
+        lrdata = pd.DataFrame(None, index=None, columns=['comparison_category', feature_name, 'age', 'fam_hx'])
+        for i in range(data.shape[0]):
+            pat_dict = {}
+            if data['parous'].iloc[i]==0:
+                pat_dict['comparison_category'] = 0
+            elif int(data['years_since_pregnancy'].iloc[i] >= recency_thres):
+                pat_dict['comparison_category'] = 1
+            else:
+                continue
+            pat_dict[feature_name] = [data[feature_name].iloc[i]]
+            pat_dict['age'] = [data['age_at_diagnosis'].iloc[i]]
+            pat_dict['fam_hx'] = [data['fam_hx'].iloc[i]]
+            if np.any(pd.isnull(list(pat_dict.values()))):
+                continue
+            lrdata = pd.concat((lrdata, pd.DataFrame(pat_dict)), ignore_index=True)
+        # 
+        lrdata = lrdata.dropna(axis=0) # drop rows that contain NA 
+        # 
+        # data for nulliparous vs. parous 
+        X = np.array(lrdata[['comparison_category', 'age', 'fam_hx']], dtype=float)
+        X[:,1] = (X[:,1] - np.mean(X[:,1]))/np.std(X[:,1]) # standard scale
+        y = np.array(lrdata[feature_name], dtype=float)
+        sample_size = X.shape[0]
+        # 
+        oddsratios, cis, pvals = get_oddsratio_ci(X, y)
+        print(f'## {feature_name} (N={sample_size}): OR={oddsratios[0]:.2f} ({cis[0][0]:.2f}-{cis[0][1]:.2f}), p={pvals[0]}')

@@ -21,16 +21,6 @@ data = data.iloc[(data.exclude_demo.values!=1) & (data.exclude_tum.values!=1),:]
 # mark family history as none for patients who are missing it 
 data.fam_hx = data.fam_hx.fillna(0.)
 
-# for i in data.index:
-#     firstn = data.loc[i,'first_name']
-#     lastn = data.loc[i,'last_name']
-#     for j in data.index[i+1:]:
-#         query_firstn = data.loc[j,'first_name']
-#         query_lastn = data.loc[j,'last_name']
-#         if ((query_firstn.lower().startswith(firstn.lower())) | (query_firstn.lower().endswith(firstn.lower()))):
-#             if ((query_lastn.lower().startswith(lastn.lower())) | (query_lastn.lower().endswith(lastn.lower()))):
-#                 print(f'Possible match: {i} - {firstn} {lastn} vs. {j} - {query_firstn} {query_lastn}')
-
 ###################################
 #### Define analysis functions ####
 ###################################
