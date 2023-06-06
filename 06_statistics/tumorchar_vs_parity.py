@@ -200,7 +200,7 @@ for parity_comparison in parity_comparisons.keys():
     print(f'#### {parity_comparison} ####')
     ref = parity_comparisons[parity_comparison]['ref']
     comp = parity_comparisons[parity_comparison]['comp']
-    results = pd.DataFrame(columns=['Variable of interest', 'Category', comp, ref, 'OR (95% CI)', 'p-value'])
+    results = pd.DataFrame(columns=['Variable of interest', 'Category', ref, comp, 'OR (95% CI)', 'p-value'])
     for feature_name in feature_names:
         X, y = generate_lrdata(data, parity_ref=ref, parity_comp=comp, feature_name=feature_name)
         if ((np.sum((X[comp]==0) & (y==1))==0) | (np.sum((X[comp]==1) & (y==1))==0)):
