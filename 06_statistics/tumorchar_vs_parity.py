@@ -207,6 +207,12 @@ for parity_comparison in parity_comparisons.keys():
             print(f'# Cannot perform comparison for {feature_name} due to lack of data\n')
         else:
             crosstab = pd.crosstab(X[comp], y)
+            totals = crosstab.sum(axis=0)
+            for i in crosstab.index:
+                for j in crosstab.columns:
+                    cts = crosstab.loc[i,j]
+                    pcts = 100 * cts/totals[j]
+                    crosstab.loc[i,j] = f'{cts} ({pcts:.1f}%)'
             oddsratios, cis, pvals = get_oddsratio_ci(X, y)
             or_formatted = f'{oddsratios[0]:.2f} ({cis[0][0]:.2f}-{cis[0][1]:.2f})'
             pval_formatted = f'{pvals[0]:.4f}'
