@@ -221,8 +221,8 @@ for parity_comparison in parity_comparisons.keys():
                 pd.DataFrame({
                     'Variable of interest' : [feature_name, None],
                     'Category' : ['Yes', 'No'],
-                    parity_comparisons[parity_comparison]['ref'] : [crosstab.loc[1,0], crosstab.loc[1,1]],
-                    parity_comparisons[parity_comparison]['comp'] : [crosstab.loc[0,0], crosstab.loc[0,1]],
+                    parity_comparisons[parity_comparison]['ref'] : [crosstab.loc[1,1], crosstab.loc[1,0]],
+                    parity_comparisons[parity_comparison]['comp'] : [crosstab.loc[0,1], crosstab.loc[0,0]],
                     'OR (95% CI)' : [or_formatted, None],
                     'p-value' : [pval_formatted, None]
                 })
