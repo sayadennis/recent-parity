@@ -166,7 +166,7 @@ for parity_comparison in parity_comparisons.keys():
     print(f'#### {parity_comparison} ####')
     ref = parity_comparisons[parity_comparison]['ref']
     comp = parity_comparisons[parity_comparison]['comp']
-    results = pd.DataFrame(columns=['Variable of interest', 'Stratification', 'Category', ref, comp, 'OR (95% CI)', 'p-value'])
+    results = pd.DataFrame(columns=['Variable of interest', 'Stratification', 'Category', comp, ref, 'OR (95% CI)', 'p-value'])
     for feature_name in feature_names:
         for stratification in stratifications:
             subdata = data.iloc[data.biomarker_subtypes.values==stratification,:]
@@ -190,8 +190,8 @@ for parity_comparison in parity_comparisons.keys():
                         'Variable of interest' : [feature_name, None],
                         'Stratification' : [stratification, None],
                         'Category' : ['Yes', 'No'],
-                        parity_comparisons[parity_comparison]['ref'] : [crosstab.loc[1,1], crosstab.loc[1,0]],
-                        parity_comparisons[parity_comparison]['comp'] : [crosstab.loc[0,1], crosstab.loc[0,0]],
+                        parity_comparisons[parity_comparison]['comp'] : [crosstab.loc[1,1], crosstab.loc[1,0]],
+                        parity_comparisons[parity_comparison]['ref'] : [crosstab.loc[0,1], crosstab.loc[0,0]],
                         'OR (95% CI)' : [or_formatted, None],
                         'p-value' : [pval_formatted, None]
                     })
