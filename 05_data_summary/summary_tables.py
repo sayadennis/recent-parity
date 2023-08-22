@@ -181,9 +181,13 @@ main_table['Overall'] = main_table[
     ['Nulliparous', '<5 years', '5-10 years', '>=10 years']
 ].sum(axis=1).astype(int)
 
+for j in ['Nulliparous', '<5 years', '5-10 years', '>=10 years']:
+    ol = main_table.iloc[np.invert([x.startswith('ANY') for x in main_table.index]),:][j].sum() - main_table.loc['ANY_PATHO_MUTATION',j]
+    print(f'{j}: {ol} patients belong in more than one category')
+
 for i in main_table.index:
     for j in ['Nulliparous', '<5 years', '5-10 years', '>=10 years']:
-        percentage = 100*main_table.loc[i,j]/main_table.loc[i,'Overall']
+        percentage = 100*main_table.loc[i,j]/(data.parity_category==j).sum()
         main_table.loc[i,j] = f'{main_table.loc[i,j]} ({percentage:.1f}%)'
 
 main_table['super_category'] = 'genetic'
