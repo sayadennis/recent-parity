@@ -45,10 +45,11 @@ for i in data.index:
         data.loc[i,'parity_category'] = '>=10 years'
 
 data['nulliparous'] = np.invert(data['parous'].astype(bool)).astype(float)
-data['parity <5 years'] = np.where(np.isnan(data['years_since_pregnancy']), np.nan, data['years_since_pregnancy'] < 5)
-data['parity >=5 years'] = np.where(np.isnan(data['years_since_pregnancy']), np.nan, data['years_since_pregnancy'] >= 5)
-data['parity <10 years'] = np.where(np.isnan(data['years_since_pregnancy']), np.nan, data['years_since_pregnancy'] < 10)
-data['parity >=10 years'] = np.where(np.isnan(data['years_since_pregnancy']), np.nan, data['years_since_pregnancy'] >= 10)
+data['parity <5 years'] = np.where((data['parous']==0) | np.isnan(data['years_since_pregnancy']), np.nan, data['years_since_pregnancy'] < 5)
+data['parity >=5 years'] = np.where((data['parous']==0) | np.isnan(data['years_since_pregnancy']), np.nan, data['years_since_pregnancy'] >= 5)
+data['parity <10 years'] = np.where((data['parous']==0) | np.isnan(data['years_since_pregnancy']), np.nan, data['years_since_pregnancy'] < 10)
+data['parity >=10 years'] = np.where((data['parous']==0) | np.isnan(data['years_since_pregnancy']), np.nan, data['years_since_pregnancy'] >= 10)
+data['parity 5-10 years'] = np.where((data['parous']==0) | np.isnan(data['years_since_pregnancy']), np.nan, (data['years_since_pregnancy'] >= 5) & (data['years_since_pregnancy'] < 10))
 
 ## Fill in biomarker subtypes 
 data['biomarker_subtypes'] = None
@@ -137,13 +138,23 @@ for i, parity_category in enumerate(crosstab.columns):
 
 feature_names=['er_pr_positive', 'her2_positive', 'triple_negative', 'grade_severe_2or3', 'her2_or_tn', 'grade_severe_3']
 
-def generate_lrdata(df, parity_ref, parity_comp, feature_name):
+def generate_lrdata(df, parity_ref, parity_comp, feature_name): # -> pd.DataFrame, pd.Series:
+    """
+    Generate the input and target dataframes for logistic regression analysis.
+    Arguments:
+        df: pd.DataFrame original dataframe downloaded from REDCap. 
+        parity_ref: string indicating the column name of `df`, the entries of which identifies the samples in the reference group.
+        parity_comp: string indicating the column name of `df`, the entries of which identifies the samples in the comparison group. 
+        feature_name: string indicating the column name of `df`, the entries of which is the variable to compare. (e.g. ER/PR positive etc.) 
+    Returns:
+        X: pd.DataFrame with three columns - feature_name, age, and fam_hx
+    """
     lrdata = pd.DataFrame(None, index=df.index, columns=[parity_comp, feature_name, 'age', 'fam_hx'])
     lrdata[feature_name] = df[feature_name].astype(float)
     lrdata['age'] = df['age_at_diagnosis'].astype(float)
     lrdata['fam_hx'] = df['fam_hx'].astype(float)
     for i in df.index:
-        lrdata.loc[i,parity_comp] = 1 if df.loc[i,parity_comp]==1 else 0 if df.loc[i,parity_ref]==1 else np.nan
+        lrdata.loc[i,parity_comp] = 0 if df.loc[i,parity_ref]==1 else 1 if df.loc[i,parity_comp]==1 else np.nan
     # drop any rows with NaN
     lrdata.dropna(inplace=True, axis=0)
     # separate X and y
@@ -154,7 +165,7 @@ def generate_lrdata(df, parity_ref, parity_comp, feature_name):
     X['age'] = scaler.fit_transform(X['age'].values.reshape(-1,1))
     return X, y
 
-def get_oddsratio_ci(X, y, alpha=0.95, rep=5000):
+def get_oddsratio_ci(X, y, alpha=0.95, rep=5000): # -> tuple(list[float], list[tuple[float]], list[float]):
     or1, or2, or3 = [], [], []
     i = 0
     for i in range(rep):
@@ -191,6 +202,7 @@ parity_comparisons = {
     '<10 vs. >=10 years' : {'ref' : 'parity >=10 years', 'comp' : 'parity <10 years'},
     '<5 vs. >=10 years' : {'ref' : 'parity >=10 years', 'comp' : 'parity <5 years'},
     '<5 years vs. Nulliparous' : {'ref' : 'nulliparous', 'comp' : 'parity <5 years'},
+    '5-10 years vs. Nulliparous' : {'ref' : 'nulliparous', 'comp' : 'parity 5-10 years'},
     '<10 years vs. Nulliparous' : {'ref' : 'nulliparous', 'comp' : 'parity <10 years'},
     '>=5 years vs. Nulliparous' : {'ref' : 'nulliparous', 'comp' : 'parity >=5 years'},
     '>=10 years vs. Nulliparous' : {'ref' : 'nulliparous', 'comp' : 'parity >=10 years'},

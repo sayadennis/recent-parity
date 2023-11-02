@@ -34,12 +34,24 @@ data.fam_hx = data.fam_hx.fillna(0.)
 #########################################
 
 data['nulliparous'] = np.invert(data['parous'].astype(bool)).astype(float)
-data['parity <5 years'] = np.where(np.isnan(data['years_since_pregnancy']), np.nan, data['years_since_pregnancy'] < 5)
-data['parity >=5 years'] = np.where(np.isnan(data['years_since_pregnancy']), np.nan, data['years_since_pregnancy'] >= 5)
-data['parity <10 years'] = np.where(np.isnan(data['years_since_pregnancy']), np.nan, data['years_since_pregnancy'] < 10)
-data['parity >=10 years'] = np.where(np.isnan(data['years_since_pregnancy']), np.nan, data['years_since_pregnancy'] >= 10)
+data['parity <5 years'] = np.where((data['parous']==0) | np.isnan(data['years_since_pregnancy']), np.nan, data['years_since_pregnancy'] < 5)
+data['parity >=5 years'] = np.where((data['parous']==0) | np.isnan(data['years_since_pregnancy']), np.nan, data['years_since_pregnancy'] >= 5)
+data['parity <10 years'] = np.where((data['parous']==0) | np.isnan(data['years_since_pregnancy']), np.nan, data['years_since_pregnancy'] < 10) 
+data['parity >=10 years'] = np.where((data['parous']==0) | np.isnan(data['years_since_pregnancy']), np.nan, data['years_since_pregnancy'] >= 10) 
+data['parity 5-10 years'] = np.where((data['parous']==0) | np.isnan(data['years_since_pregnancy']), np.nan, (data['years_since_pregnancy'] >= 5) & (data['years_since_pregnancy'] < 10))
 
-genes=['any_patho_mutation', 'brca1', 'brca2', 'palb2', 'tp53', 'chek2', 'pten', 'cdh1', 'stk11', 'atm']
+genes=[
+    'any_patho_mutation', 
+    'brca1', 
+    'brca2', 
+    'palb2', 
+    'chek2', 
+    'atm',
+    'tp53', 
+    'pten', 
+    'stk11', 
+    'cdh1', 
+]
 
 data['any_patho_mutation'] = (data['any_patho_mutation'].map(dd['any_patho_mutation']['Choices, Calculations, OR Slider Labels'])=='Pathogenic').astype(int)
 
@@ -58,7 +70,7 @@ def generate_lrdata(df, parity_ref, parity_comp, feature_name):
     lrdata['age'] = df['age_at_diagnosis'].astype(float)
     lrdata['fam_hx'] = df['fam_hx'].astype(float)
     for i in df.index:
-        lrdata.loc[i,parity_comp] = 1 if df.loc[i,parity_comp]==1 else 0 if df.loc[i,parity_ref]==1 else np.nan
+        lrdata.loc[i,parity_comp] = 0 if df.loc[i,parity_ref]==1 else 1 if df.loc[i,parity_comp]==1 else np.nan
     # drop any rows with NaN
     lrdata.dropna(inplace=True, axis=0)
     # separate X and y
@@ -107,6 +119,7 @@ parity_comparisons = {
     '<10 vs. >=10 years' : {'ref' : 'parity >=10 years', 'comp' : 'parity <10 years'},
     '<5 vs. >=10 years' : {'ref' : 'parity >=10 years', 'comp' : 'parity <5 years'},
     '<5 years vs. Nulliparous' : {'ref' : 'nulliparous', 'comp' : 'parity <5 years'},
+    '5-10 years vs. Nulliparous' : {'ref' : 'nulliparous', 'comp' : 'parity 5-10 years'},
     '<10 years vs. Nulliparous' : {'ref' : 'nulliparous', 'comp' : 'parity <10 years'},
     '>=5 years vs. Nulliparous' : {'ref' : 'nulliparous', 'comp' : 'parity >=5 years'},
     '>=10 years vs. Nulliparous' : {'ref' : 'nulliparous', 'comp' : 'parity >=10 years'},

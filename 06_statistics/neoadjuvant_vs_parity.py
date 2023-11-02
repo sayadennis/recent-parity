@@ -43,10 +43,11 @@ for i in data.index:
         data.loc[i,'parity_category'] = '>=10 years'
 
 data['nulliparous'] = np.invert(data['parous'].astype(bool)).astype(float)
-data['parity <5 years'] = np.where(np.isnan(data['years_since_pregnancy']), np.nan, data['years_since_pregnancy'] < 5)
-data['parity >=5 years'] = np.where(np.isnan(data['years_since_pregnancy']), np.nan, data['years_since_pregnancy'] >= 5)
-data['parity <10 years'] = np.where(np.isnan(data['years_since_pregnancy']), np.nan, data['years_since_pregnancy'] < 10)
-data['parity >=10 years'] = np.where(np.isnan(data['years_since_pregnancy']), np.nan, data['years_since_pregnancy'] >= 10)
+data['parity <5 years'] = np.where((data['parous']==0) | np.isnan(data['years_since_pregnancy']), np.nan, data['years_since_pregnancy'] < 5)
+data['parity >=5 years'] = np.where((data['parous']==0) | np.isnan(data['years_since_pregnancy']), np.nan, data['years_since_pregnancy'] >= 5)
+data['parity <10 years'] = np.where((data['parous']==0) | np.isnan(data['years_since_pregnancy']), np.nan, data['years_since_pregnancy'] < 10) 
+data['parity >=10 years'] = np.where((data['parous']==0) | np.isnan(data['years_since_pregnancy']), np.nan, data['years_since_pregnancy'] >= 10) 
+data['parity 5-10 years'] = np.where((data['parous']==0) | np.isnan(data['years_since_pregnancy']), np.nan, (data['years_since_pregnancy'] >= 5) & (data['years_since_pregnancy'] < 10))
 
 ## Fill in biomarker subtypes 
 data['biomarker_subtypes'] = None
@@ -105,7 +106,7 @@ def generate_lrdata(df, parity_ref, parity_comp, feature_name):
     lrdata['age'] = df['age_at_diagnosis'].astype(float)
     lrdata['fam_hx'] = df['fam_hx'].astype(float)
     for i in df.index:
-        lrdata.loc[i,parity_comp] = 1 if df.loc[i,parity_comp]==1 else 0 if df.loc[i,parity_ref]==1 else np.nan
+        lrdata.loc[i,parity_comp] = 0 if df.loc[i,parity_ref]==1 else 1 if df.loc[i,parity_comp]==1 else np.nan
     # drop any rows with NaN
     lrdata.dropna(inplace=True, axis=0)
     # separate X and y
@@ -154,6 +155,7 @@ parity_comparisons = {
     '<10 vs. >=10 years' : {'ref' : 'parity >=10 years', 'comp' : 'parity <10 years'},
     '<5 vs. >=10 years' : {'ref' : 'parity >=10 years', 'comp' : 'parity <5 years'},
     '<5 years vs. Nulliparous' : {'ref' : 'nulliparous', 'comp' : 'parity <5 years'},
+    '5-10 years vs. Nulliparous' : {'ref' : 'nulliparous', 'comp' : 'parity 5-10 years'},
     '<10 years vs. Nulliparous' : {'ref' : 'nulliparous', 'comp' : 'parity <10 years'},
     '>=5 years vs. Nulliparous' : {'ref' : 'nulliparous', 'comp' : 'parity >=5 years'},
     '>=10 years vs. Nulliparous' : {'ref' : 'nulliparous', 'comp' : 'parity >=10 years'},
