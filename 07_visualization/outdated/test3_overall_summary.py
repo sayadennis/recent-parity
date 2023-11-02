@@ -40,7 +40,7 @@ ax[0, 0].bar(
 ax[0, 0].set_ylim(0, None)
 ax[0, 0].set_xticks([1,3,4,5,6])
 ax[0, 0].set_xticklabels(
-    ['Overall', 'Nulliparous', '<5 yrs', '5-10 yrs', '>=10 yrs'],
+    ['Overall', 'Nulliparous', '<5 years', '5-10 years', '>=10 years'],
     rotation=40, ha='right'
 )
 ax[0, 0].set_ylabel('Mean Age')
@@ -69,7 +69,7 @@ ax[0, 1].bar(
 
 ax[0, 1].set_xticks([1,3,4,5,6])
 ax[0, 1].set_xticklabels(
-    ['Overall', 'Nulliparous', '<5 yrs', '5-10 yrs', '>=10 yrs'],
+    ['Overall', 'Nulliparous', '<5 years', '5-10 years', '>=10 years'],
     rotation=40, ha='right'
 )
 ax[0, 1].set_ylim(0, None)
@@ -96,12 +96,12 @@ lines = ax[0, 2].bar(
     edgecolor='black',
     width=1.0,
 )
-for item, label in zip(lines, ['Overall', 'Nulliparous', '<5 yrs', '5-10 yrs', '>=10 yrs']):
+for item, label in zip(lines, ['Overall', 'Nulliparous', '<5 years', '5-10 years', '>=10 years']):
     item.set_label(label)
 
 ax[0, 2].set_xticks([1,3,4,5,6])
 ax[0, 2].set_xticklabels(
-    ['Overall', 'Nulliparous', '<5 yrs', '5-10 yrs', '>=10 yrs'],
+    ['Overall', 'Nulliparous', '<5 years', '5-10 years', '>=10 years'],
     rotation=40, ha='right'
 )
 ax[0, 2].set_ylim(0, None)

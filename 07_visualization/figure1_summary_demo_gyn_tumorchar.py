@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 
 din = "/share/fsmresfiles/breast_cancer_pregnancy/summary_tables"
 fin = "20230509_super_summary_table.csv"
-fout = "20230822_test2_summary_plot.png"
+fout = "figure1_demo_gyn_tumor.png"
 
 data = pd.read_csv(f"{din}/{fin}")
 
@@ -34,13 +34,14 @@ ax[0, 0].bar(
     yerr=sds, capsize=0,
     color=['gray'] + pastel_colors,
     edgecolor='black',
-    width=1.0,
+    linewidth=.5,
+    error_kw=dict(ecolor='black', elinewidth=.5)
 )
 
 ax[0, 0].set_ylim(0, None)
 ax[0, 0].set_xticks([1,3,4,5,6])
 ax[0, 0].set_xticklabels(
-    ['Overall', 'Nulliparous', '<5 yrs', '5-10 yrs', '>=10 yrs'],
+    ['Overall', 'Nulliparous', '<5 years', '5-10 years', '>=10 years'],
     rotation=40, ha='right'
 )
 ax[0, 0].set_ylabel('Mean Age')
@@ -64,12 +65,13 @@ ax[0, 1].bar(
     yerr=sds, capsize=0,
     color=['gray'] + pastel_colors,
     edgecolor='black',
-    width=1.0,
+    linewidth=.5,
+    error_kw=dict(ecolor='black', elinewidth=.5)
 )
 
 ax[0, 1].set_xticks([1,3,4,5,6])
 ax[0, 1].set_xticklabels(
-    ['Overall', 'Nulliparous', '<5 yrs', '5-10 yrs', '>=10 yrs'],
+    ['Overall', 'Nulliparous', '<5 years', '5-10 years', '>=10 years'],
     rotation=40, ha='right'
 )
 ax[0, 1].set_ylim(0, None)
@@ -94,14 +96,15 @@ lines = ax[0, 2].bar(
     yerr=sds, capsize=0,
     color=['gray'] + pastel_colors,
     edgecolor='black',
-    width=1.0,
+    linewidth=.5,
+    error_kw=dict(ecolor='black', elinewidth=.5)
 )
-for item, label in zip(lines, ['Overall', 'Nulliparous', '<5 yrs', '5-10 yrs', '>=10 yrs']):
+for item, label in zip(lines, ['Overall', 'Nulliparous', '<5 years', '5-10 years', '>=10 years']):
     item.set_label(label)
 
 ax[0, 2].set_xticks([1,3,4,5,6])
 ax[0, 2].set_xticklabels(
-    ['Overall', 'Nulliparous', '<5 yrs', '5-10 yrs', '>=10 yrs'],
+    ['Overall', 'Nulliparous', '<5 years', '5-10 years', '>=10 years'],
     rotation=40, ha='right'
 )
 ax[0, 2].set_ylim(0, None)
@@ -123,6 +126,7 @@ ax[1,0].bar(
     label='Nulliparous',
     color=pastel_colors[0],
     edgecolor='black',
+    linewidth=.5,
 )
 ax[1,0].bar(
     [1,2,3],
@@ -131,6 +135,7 @@ ax[1,0].bar(
     label='<5 years',
     color=pastel_colors[1],
     edgecolor='black',
+    linewidth=.5,
 )
 ax[1,0].bar(
     [1,2,3],
@@ -139,6 +144,7 @@ ax[1,0].bar(
     label='5-10 years',
     color=pastel_colors[2],
     edgecolor='black',
+    linewidth=.5,
 )
 ax[1,0].bar(
     [1,2,3],
@@ -147,6 +153,7 @@ ax[1,0].bar(
     label='>=10 years',
     color=pastel_colors[3],
     edgecolor='black',
+    linewidth=.5,
 )
 ax[1,0].set_ylabel('Number of patients')
 ax[1,0].set_title('Biomarker category')
@@ -172,6 +179,7 @@ ax[1,1].bar(
     label='Nulliparous',
     color=pastel_colors[0],
     edgecolor='black',
+    linewidth=.5,
 )
 ax[1,1].bar(
     [1,2,3],
@@ -180,6 +188,7 @@ ax[1,1].bar(
     label='<5 years',
     color=pastel_colors[1],
     edgecolor='black',
+    linewidth=.5,
 )
 ax[1,1].bar(
     [1,2,3],
@@ -188,6 +197,7 @@ ax[1,1].bar(
     label='5-10 years',
     color=pastel_colors[2],
     edgecolor='black',
+    linewidth=.5,
 )
 ax[1,1].bar(
     [1,2,3],
@@ -196,6 +206,7 @@ ax[1,1].bar(
     label='>=10 years',
     color=pastel_colors[3],
     edgecolor='black',
+    linewidth=.5,
 )
 ax[1,1].set_ylabel('Number of patients')
 ax[1,1].set_title('Histology')
@@ -203,7 +214,7 @@ ax[1,1].set_xticks([1,2,3])
 ax[1,1].set_xticklabels(['Invasive', 'Non-invasive', 'Other'], rotation=45, ha='right')
 # ax[1,1].legend()
 
-## Histologic Grade - 1
+## Histologic Grade
 
 cts = {}
 for category in ['Nulliparous', '<5 years', '5-10 years', '>=10 years']:
@@ -222,6 +233,7 @@ ax[1,2].bar(
     label='Nulliparous',
     color=pastel_colors[0],
     edgecolor='black',
+    linewidth=.5,
 )
 ax[1,2].bar(
     [1,2,3],
@@ -230,6 +242,7 @@ ax[1,2].bar(
     label='<5 years',
     color=pastel_colors[1],
     edgecolor='black',
+    linewidth=.5,
 )
 ax[1,2].bar(
     [1,2,3],
@@ -238,6 +251,7 @@ ax[1,2].bar(
     label='5-10 years',
     color=pastel_colors[2],
     edgecolor='black',
+    linewidth=.5,
 )
 ax[1,2].bar(
     [1,2,3],
@@ -246,6 +260,7 @@ ax[1,2].bar(
     label='>=10 years',
     color=pastel_colors[3],
     edgecolor='black',
+    linewidth=.5,
 )
 ax[1,2].set_ylabel('Number of patients')
 ax[1,2].set_title('Histologic Grade')
