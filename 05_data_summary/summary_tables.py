@@ -345,7 +345,7 @@ for natvarcat in main_table.main_category.unique():
     totals = subtable.sum(axis=0)
     cts = subtable[['Nulliparous', '<5 years', '5-10 years', '>=10 years', 'Overall']]
     cts.index = subtable.sub_category
-    pcts = subtable[['Nulliparous', '<5 years', '5-10 years', '>=10 years', 'Overall']] / totals[['Nulliparous', '<5 years', '5-10 years', '>=10 years', 'Overall']]
+    pcts = cts.div(cts['Overall'], axis=0) # subtable[['Nulliparous', '<5 years', '5-10 years', '>=10 years', 'Overall']] / totals[['Nulliparous', '<5 years', '5-10 years', '>=10 years', 'Overall']]
     pcts.index = subtable.sub_category
     for subcat in subtable.sub_category.values:
         for par_cat in ['Nulliparous', '<5 years', '5-10 years', '>=10 years', 'Overall']:
