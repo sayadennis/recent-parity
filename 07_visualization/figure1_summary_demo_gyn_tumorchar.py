@@ -120,9 +120,16 @@ for category in ['Nulliparous', '<5 years', '5-10 years', '>=10 years']:
         for bm in ['ER/PR+ HER2-', 'HER2+', 'Triple Negative']
     ]
 
+# Comment the below chunk if we want a stacked bar graph (of counts) as opposed to a stacked percentage chart
+pcts = {}
+for key in cts.keys():
+    pcts[key] = []
+    for i in range(len(cts['Nulliparous'])):
+        pcts[key].append(100 * cts[key][i]/np.sum([cts[x][i] for x in cts.keys()]))
+
 ax[1,0].bar(
     [1,2,3],
-    cts['Nulliparous'],
+    pcts['Nulliparous'],
     label='Nulliparous',
     color=pastel_colors[0],
     edgecolor='black',
@@ -130,8 +137,8 @@ ax[1,0].bar(
 )
 ax[1,0].bar(
     [1,2,3],
-    cts['<5 years'],
-    bottom=cts['Nulliparous'],
+    pcts['<5 years'],
+    bottom=pcts['Nulliparous'],
     label='<5 years',
     color=pastel_colors[1],
     edgecolor='black',
@@ -139,8 +146,8 @@ ax[1,0].bar(
 )
 ax[1,0].bar(
     [1,2,3],
-    cts['5-10 years'],
-    bottom=[np.sum([x,y]) for x,y in zip(cts['Nulliparous'], cts['<5 years'])],
+    pcts['5-10 years'],
+    bottom=[np.sum([x,y]) for x,y in zip(pcts['Nulliparous'], pcts['<5 years'])],
     label='5-10 years',
     color=pastel_colors[2],
     edgecolor='black',
@@ -148,16 +155,17 @@ ax[1,0].bar(
 )
 ax[1,0].bar(
     [1,2,3],
-    cts['>=10 years'],
-    bottom=[np.sum([x,y,z]) for x,y,z in zip(cts['Nulliparous'], cts['<5 years'], cts['5-10 years'])],
+    pcts['>=10 years'],
+    bottom=[np.sum([x,y,z]) for x,y,z in zip(pcts['Nulliparous'], pcts['<5 years'], pcts['5-10 years'])],
     label='>=10 years',
     color=pastel_colors[3],
     edgecolor='black',
     linewidth=.5,
 )
-ax[1,0].set_ylabel('Number of patients')
+ax[1,0].set_ylabel('Percentage of patients')
 ax[1,0].set_title('Biomarker category')
 ax[1,0].set_xticks([1,2,3])
+ax[1,0].set_ylim([0.,100.])
 ax[1,0].set_xticklabels(['ER/PR+ HER2-', 'HER2+', 'Triple Negative'], rotation=45, ha='right')
 # ax[1,0].legend()
 
@@ -173,9 +181,16 @@ for category in ['Nulliparous', '<5 years', '5-10 years', '>=10 years']:
         for varnames in [['IDC', 'ILC', 'Invasive (non-specific)'],['DCIS'],['Other']]
     ]
 
+# Comment the below chunk if we want a stacked bar graph (of counts) as opposed to a stacked percentage chart
+pcts = {}
+for key in cts.keys():
+    pcts[key] = []
+    for i in range(len(cts['Nulliparous'])):
+        pcts[key].append(100 * cts[key][i]/np.sum([cts[x][i] for x in cts.keys()]))
+
 ax[1,1].bar(
     [1,2,3],
-    cts['Nulliparous'],
+    pcts['Nulliparous'],
     label='Nulliparous',
     color=pastel_colors[0],
     edgecolor='black',
@@ -183,8 +198,8 @@ ax[1,1].bar(
 )
 ax[1,1].bar(
     [1,2,3],
-    cts['<5 years'],
-    bottom=cts['Nulliparous'],
+    pcts['<5 years'],
+    bottom=pcts['Nulliparous'],
     label='<5 years',
     color=pastel_colors[1],
     edgecolor='black',
@@ -192,8 +207,8 @@ ax[1,1].bar(
 )
 ax[1,1].bar(
     [1,2,3],
-    cts['5-10 years'],
-    bottom=[np.sum([x,y]) for x,y in zip(cts['Nulliparous'], cts['<5 years'])],
+    pcts['5-10 years'],
+    bottom=[np.sum([x,y]) for x,y in zip(pcts['Nulliparous'], pcts['<5 years'])],
     label='5-10 years',
     color=pastel_colors[2],
     edgecolor='black',
@@ -201,8 +216,8 @@ ax[1,1].bar(
 )
 ax[1,1].bar(
     [1,2,3],
-    cts['>=10 years'],
-    bottom=[np.sum([x,y,z]) for x,y,z in zip(cts['Nulliparous'], cts['<5 years'], cts['5-10 years'])],
+    pcts['>=10 years'],
+    bottom=[np.sum([x,y,z]) for x,y,z in zip(pcts['Nulliparous'], pcts['<5 years'], pcts['5-10 years'])],
     label='>=10 years',
     color=pastel_colors[3],
     edgecolor='black',
@@ -211,6 +226,7 @@ ax[1,1].bar(
 ax[1,1].set_ylabel('Number of patients')
 ax[1,1].set_title('Histology')
 ax[1,1].set_xticks([1,2,3])
+ax[1,1].set_ylim([0.,100.])
 ax[1,1].set_xticklabels(['Invasive', 'Non-invasive', 'Other'], rotation=45, ha='right')
 # ax[1,1].legend()
 
@@ -226,10 +242,16 @@ for category in ['Nulliparous', '<5 years', '5-10 years', '>=10 years']:
         for varnames in [['1'],['2'],['3']]
     ]
 
+# Comment the below chunk if we want a stacked bar graph (of counts) as opposed to a stacked percentage chart
+pcts = {}
+for key in cts.keys():
+    pcts[key] = []
+    for i in range(len(cts['Nulliparous'])):
+        pcts[key].append(100 * cts[key][i]/np.sum([cts[x][i] for x in cts.keys()]))
 
 ax[1,2].bar(
     [1,2,3],
-    cts['Nulliparous'],
+    pcts['Nulliparous'],
     label='Nulliparous',
     color=pastel_colors[0],
     edgecolor='black',
@@ -237,8 +259,8 @@ ax[1,2].bar(
 )
 ax[1,2].bar(
     [1,2,3],
-    cts['<5 years'],
-    bottom=cts['Nulliparous'],
+    pcts['<5 years'],
+    bottom=pcts['Nulliparous'],
     label='<5 years',
     color=pastel_colors[1],
     edgecolor='black',
@@ -246,8 +268,8 @@ ax[1,2].bar(
 )
 ax[1,2].bar(
     [1,2,3],
-    cts['5-10 years'],
-    bottom=[np.sum([x,y]) for x,y in zip(cts['Nulliparous'], cts['<5 years'])],
+    pcts['5-10 years'],
+    bottom=[np.sum([x,y]) for x,y in zip(pcts['Nulliparous'], pcts['<5 years'])],
     label='5-10 years',
     color=pastel_colors[2],
     edgecolor='black',
@@ -255,8 +277,8 @@ ax[1,2].bar(
 )
 ax[1,2].bar(
     [1,2,3],
-    cts['>=10 years'],
-    bottom=[np.sum([x,y,z]) for x,y,z in zip(cts['Nulliparous'], cts['<5 years'], cts['5-10 years'])],
+    pcts['>=10 years'],
+    bottom=[np.sum([x,y,z]) for x,y,z in zip(pcts['Nulliparous'], pcts['<5 years'], pcts['5-10 years'])],
     label='>=10 years',
     color=pastel_colors[3],
     edgecolor='black',
@@ -265,13 +287,17 @@ ax[1,2].bar(
 ax[1,2].set_ylabel('Number of patients')
 ax[1,2].set_title('Histologic Grade')
 ax[1,2].set_xticks([1,2,3])
+ax[1,2].set_ylim([0.,100.])
 ax[1,2].set_xticklabels(['Grade I', 'Grade II', 'Grade III'], rotation=45, ha='right')
 
 ## Remove the top and right spines for all subplots
 for row in ax:
     for axis in row:
-        axis.spines['top'].set_visible(False)
         axis.spines['right'].set_visible(False)
+
+## Remove the top spines only for the 3 plots in the top row
+for axis in ax[0]:
+    axis.spines['top'].set_visible(False)
 
 plt.tight_layout()
 fig.savefig(f"/share/fsmresfiles/breast_cancer_pregnancy/plots/{fout}")
