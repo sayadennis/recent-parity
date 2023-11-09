@@ -125,9 +125,30 @@ print(f'Tumor size comparison between NAC (clinical size) and NAC (pathological 
 ## Nodal involvement
 
 # Distribution among NAC patients
-data.clin_node_stag_cat.map(dd['clin_node_stag_cat']['Choices, Calculations, OR Slider Labels']).value_counts()
+nac_clinical = data.iloc[data.nat.values==1,:].clin_node_stag_cat.map(dd['clin_node_stag_cat']['Choices, Calculations, OR Slider Labels']).value_counts()
+nac_patho = data.iloc[data.nat.values==1,:].node_staging_category.map(dd['node_staging_category']['Choices, Calculations, OR Slider Labels']).value_counts()
 # Distribution among all patients
-data.iloc[data.nat.values!=1,:].node_staging_category.map(dd['node_staging_category']['Choices, Calculations, OR Slider Labels']).value_counts()
+nonac_patho = data.iloc[data.nat.values!=1,:].node_staging_category.map(dd['node_staging_category']['Choices, Calculations, OR Slider Labels']).value_counts()
+
+nodal_involvement = pd.DataFrame(index=['N0', 'N1-3', 'NX'], columns=['No NAC (patho)', 'Had NAC (clinical)', 'Had NAC (patho)'])
+
+for label, df in zip(['No NAC (patho)', 'Had NAC (clinical)', 'Had NAC (patho)'], [nonac_patho, nac_clinical, nac_patho]):
+    nodal_involvement.loc['N0', label] = df.loc[['N0' in x for x in df.index]].sum()
+    nodal_involvement.loc['N1-3', label] = df.iloc[[('N1' in x) | ('N2' in x) | ('N3' in x) for x in df.index]].sum()
+    nodal_involvement.loc['NX', label] = df.iloc[['NX' in x for x in df.index]].sum()
+
+nodal_involvement_pct = nodal_involvement.copy()
+for i in nodal_involvement.index:
+    for j in nodal_involvement.columns:
+        ct = nodal_involvement.loc[i,j]
+        pct = 100 * ct / nodal_involvement.loc[:,j].sum(axis=0)
+        nodal_involvement_pct.loc[i,j] = f'{ct} ({pct:.1f}%)'
+
+for label in ['No NAC (patho)', 'Had NAC (clinical)', 'Had NAC (patho)']:
+    total_ct = nodal_involvement.loc[:,label].sum(axis=0)
+    nodal_involvement_pct.loc['Total', label] = f'{total_ct} (100.0%)'
+
+nodal_involvement_pct.to_csv(f'{dn}/summary_tables/nodal_involvement_nac_vs_not.csv')
 
 ## Age
 fig, ax = plt.subplots(figsize=(6,4))
@@ -153,4 +174,67 @@ t, p = ttest_ind(
     data.iloc[data.nat.values==1,:]['age_at_diagnosis'].dropna().values
 )
 print(f'Age comparison: t={t:.2f} (p={p:.2e})')
+
+# Age separated by NAC status and biologic subtype! 
+fig, ax = plt.subplots(figsize=(6,4))
+
+pos = [1,2,4,5,7,8]
+violins = ax.violinplot(
+    [data.iloc[(data.nat.values!=1) & (data.biomarker_subtypes.values=='ER/PR+ HER2-'),:]['age_at_diagnosis'].dropna().values,
+    data.iloc[(data.nat.values==1) & (data.biomarker_subtypes.values=='ER/PR+ HER2-'),:]['age_at_diagnosis'].dropna().values,
+    data.iloc[(data.nat.values!=1) & (data.biomarker_subtypes.values=='HER2+'),:]['age_at_diagnosis'].dropna().values,
+    data.iloc[(data.nat.values==1) & (data.biomarker_subtypes.values=='HER2+'),:]['age_at_diagnosis'].dropna().values,
+    data.iloc[(data.nat.values!=1) & (data.biomarker_subtypes.values=='Triple Negative'),:]['age_at_diagnosis'].dropna().values,
+    data.iloc[(data.nat.values==1) & (data.biomarker_subtypes.values=='Triple Negative'),:]['age_at_diagnosis'].dropna().values],
+    pos, widths=0.7, showmedians=True, showextrema=True
+)
+
+for i in [0,2,4]:
+    violins['bodies'][i].set_facecolor('blue')
+
+for i in [1,3,5]:
+    violins['bodies'][i].set_facecolor('orange')
+
+ax.set_xticks([1.5, 4.5, 7.5])
+ax.set_xticklabels(['ER/PR+ HER2-', 'HER2+', 'Triple Negative'], ha='right', rotation=30)
+ax.set_ylabel('Age at diagnosis')
+ax.set_title('Diagnosis age by NAC status and biologic subtype')
+ax.legend(['No NAC', 'Had NAC'], loc='lower right')
+
+plt.tight_layout()
+fig.savefig(f'{dn}/plots/age_by_nac_and_biomarker.png')
+plt.close()
+
+# Year of diagnosis by NAC status and biologic subtype
+
+fig, ax = plt.subplots(figsize=(6,4))
+
+data = data.iloc[data.year_of_diagnosis.values>=2010,:]
+
+pos = [1,2,4,5,7,8]
+violins = ax.violinplot(
+    [data.iloc[(data.nat.values!=1) & (data.biomarker_subtypes.values=='ER/PR+ HER2-'),:]['year_of_diagnosis'].dropna().values,
+    data.iloc[(data.nat.values==1) & (data.biomarker_subtypes.values=='ER/PR+ HER2-'),:]['year_of_diagnosis'].dropna().values,
+    data.iloc[(data.nat.values!=1) & (data.biomarker_subtypes.values=='HER2+'),:]['year_of_diagnosis'].dropna().values,
+    data.iloc[(data.nat.values==1) & (data.biomarker_subtypes.values=='HER2+'),:]['year_of_diagnosis'].dropna().values,
+    data.iloc[(data.nat.values!=1) & (data.biomarker_subtypes.values=='Triple Negative'),:]['year_of_diagnosis'].dropna().values,
+    data.iloc[(data.nat.values==1) & (data.biomarker_subtypes.values=='Triple Negative'),:]['year_of_diagnosis'].dropna().values],
+    pos, widths=0.7, showmedians=True, showextrema=True
+)
+
+for i in [0,2,4]:
+    violins['bodies'][i].set_facecolor('blue')
+
+for i in [1,3,5]:
+    violins['bodies'][i].set_facecolor('orange')
+
+ax.set_xticks([1.5, 4.5, 7.5])
+ax.set_xticklabels(['ER/PR+ HER2-', 'HER2+', 'Triple Negative'], ha='right', rotation=30)
+ax.set_ylabel('Year of diagnosis')
+ax.set_title('Diagnosis year by NAC status and biologic subtype')
+ax.legend(['No NAC', 'Had NAC'], loc='lower right')
+
+plt.tight_layout()
+fig.savefig(f'{dn}/plots/year_dx_by_nac_and_biomarker.png')
+plt.close()
 
