@@ -70,11 +70,45 @@ for i in data.index:
     else:
         data.loc[i,'er_pr'] = 'ER/PR-'
 
+data['nodal_involvement_nac'] = None # create new column for NAC summary purposes
+nodalinv_map = {
+    'N0' : 'N0',
+    'N1' : 'N1-3',
+    'N2' : 'N1-3',
+    'N3' : 'N1-3',
+    'NX' : 'NX',
+    'pN0' : 'N0',
+    'pN1' : 'N1-3',
+    'pN1mi' : 'N1-3',
+    'pN2' : 'N1-3',
+    'pN3' : 'N1-3',
+    'pNX' : 'NX',
+    'ypN0' : 'N0',
+    'ypN1' : 'N1-3',
+    'ypN1mi' : 'N1-3',
+    'ypN2' : 'N1-3',
+    'ypN3' : 'N1-3',
+    'ypNX' : 'NX',
+}
+for i in data.index:
+    if pd.isnull(data.loc[i,'clin_node_stag_cat']):
+        if pd.isnull(data.loc[i,'node_staging_category']):
+            continue
+        else:
+            raw_record = data.node_staging_category.map(dd['node_staging_category']['Choices, Calculations, OR Slider Labels']).loc[i]
+            data.loc[i,'nodal_involvement_nac'] = nodalinv_map[raw_record]
+    else:
+        raw_record = data.clin_node_stag_cat.map(dd['clin_node_stag_cat']['Choices, Calculations, OR Slider Labels']).loc[i]
+        data.loc[i,'nodal_involvement_nac'] = nodalinv_map[raw_record]
+
 #####################
 #### NAC summary ####
 #####################
 
-## Biologic subtype
+############################
+## Biologic subtype table ##
+############################
+
 nac_biomarker_crosstab = pd.crosstab(data.biomarker_subtypes, data.nat)
 nac_biomarker_crosstab.columns = nac_biomarker_crosstab.columns.map({0: 'No NAC', 1: 'Had NAC'})
 nac_biomarker_crosstab.columns.name = None; nac_biomarker_crosstab.index.name = None
@@ -90,14 +124,16 @@ nac_biomarker_crosstab_pct.to_csv(f'{dn}/summary_tables/nac_by_biomarker.csv', i
 chi2, p, dof, expected = chi2_contingency(nac_biomarker_crosstab)
 fisher_exact(nac_biomarker_crosstab)
 
-## Tumor size
+#############################
+## Tumor size violin plots ##
+#############################
+
 fig, ax = plt.subplots(figsize=(8,5))
 
 nonac_patho = ax.violinplot(data.iloc[data.nat.values!=1,:]['tumor_size'].dropna().values, positions=[1], showmedians=True)
 nac_clin = ax.violinplot(data.iloc[data.nat.values==1,:]['clin_tumor_size'].dropna().values, positions=[2], showmedians=True)
 nac_patho = ax.violinplot(data.iloc[data.nat.values==1,:]['tumor_size'].dropna().values, positions=[3], showmedians=True)
 
-# Customize the violin plot
 ax.set_xticks([1, 2, 3])  # Position of the columns on the x-axis
 ax.set_xticklabels(["No NAC\n(pathological)", "NAC\n(clinical)", "NAC\n(pathological)"])
 ax.set_ylabel("Tumor size (cm)")
@@ -122,7 +158,9 @@ t, p = ttest_ind(
 )
 print(f'Tumor size comparison between NAC (clinical size) and NAC (pathological size): t={t:.2f} (p={p:.2e})')
 
-## Nodal involvement
+#############################
+## Nodal involvement table ##
+#############################
 
 # Distribution among NAC patients
 nac_clinical = data.iloc[data.nat.values==1,:].clin_node_stag_cat.map(dd['clin_node_stag_cat']['Choices, Calculations, OR Slider Labels']).value_counts()
@@ -150,7 +188,89 @@ for label in ['No NAC (patho)', 'Had NAC (clinical)', 'Had NAC (patho)']:
 
 nodal_involvement_pct.to_csv(f'{dn}/summary_tables/nodal_involvement_nac_vs_not.csv')
 
-## Age
+#####################################################################################
+## Nodal involvement separated by NAC status and biologic subtype proportion chart ##
+#####################################################################################
+
+nodal_groups = data.groupby(['biomarker_subtypes', 'nat', 'nodal_involvement_nac']).size()
+
+cts = {
+    'No NAC' : [
+        nodal_groups.loc['ER/PR+ HER2-', 0.0, 'N0'],
+        nodal_groups.loc['ER/PR+ HER2-', 0.0, 'N1-3'],
+        nodal_groups.loc['ER/PR+ HER2-', 0.0, 'NX'],
+
+        nodal_groups.loc['HER2+', 0.0, 'N0'],
+        nodal_groups.loc['HER2+', 0.0, 'N1-3'],
+        nodal_groups.loc['HER2+', 0.0, 'NX'],
+
+        nodal_groups.loc['Triple Negative', 0.0, 'N0'],
+        nodal_groups.loc['Triple Negative', 0.0, 'N1-3'],
+        nodal_groups.loc['Triple Negative', 0.0, 'NX'],
+    ],
+    'Had NAC' : [
+        nodal_groups.loc['ER/PR+ HER2-', 1.0, 'N0'],
+        nodal_groups.loc['ER/PR+ HER2-', 1.0, 'N1-3'],
+        nodal_groups.loc['ER/PR+ HER2-', 1.0, 'NX'],
+
+        nodal_groups.loc['HER2+', 1.0, 'N0'],
+        nodal_groups.loc['HER2+', 1.0, 'N1-3'],
+        nodal_groups.loc['HER2+', 1.0, 'NX'],
+
+        nodal_groups.loc['Triple Negative', 1.0, 'N0'],
+        nodal_groups.loc['Triple Negative', 1.0, 'N1-3'],
+        nodal_groups.loc['Triple Negative', 1.0, 'NX'],
+    ],
+}
+
+pcts = {}
+for key in cts.keys():
+    pcts[key] = []
+    for i in range(len(cts[key])):
+        pcts[key].append(100 * cts[key][i] / np.sum([cts[x][i] for x in cts.keys()]))
+
+fig, ax = plt.subplots(figsize=(9,3))
+pos = [1,2,3,5,6,7,9,10,11]
+
+ax.bar(
+    pos,
+    pcts['No NAC'],
+    label='No NAC',
+    color='royalblue',
+    edgecolor='black',
+    linewidth=.5,
+)
+ax.bar(
+    pos,
+    pcts['Had NAC'],
+    bottom=pcts['No NAC'],
+    label='Had NAC',
+    color='gold',
+    edgecolor='black',
+    linewidth=.5,
+)
+
+ax.legend(loc='lower left')
+ax.set_ylim(0,100)
+ax.set_ylabel('Percentages')
+
+fig.subplots_adjust(bottom=0.2)
+
+ax.set_xticks(pos)
+plt.text(0.18, 0.03, 'ER/PR+ HER2-', color='black', fontsize=12, transform=plt.gcf().transFigure)
+plt.text(0.485, 0.03, 'HER2+', color='black', fontsize=12, transform=plt.gcf().transFigure)
+plt.text(0.705, 0.03, 'Triple Negative', color='black', fontsize=12, transform=plt.gcf().transFigure)
+
+ax.set_xticklabels(['N0', 'N1-3', 'NX', 'N0', 'N1-3', 'NX', 'N0', 'N1-3', 'NX'])
+ax.set_title('Proportion of patients who received NAC by nodal involvement')
+fig.savefig(f'{dn}/plots/nac_proportion_by_node_biomarker.png')
+plt.close()
+
+
+###############################
+## Diagnosis age violin plot ##
+###############################
+
 fig, ax = plt.subplots(figsize=(6,4))
 
 nonac_age = ax.violinplot(data.iloc[data.nat.values!=1,:]['age_at_diagnosis'].dropna().values, positions=[1], showmedians=True)
@@ -175,7 +295,11 @@ t, p = ttest_ind(
 )
 print(f'Age comparison: t={t:.2f} (p={p:.2e})')
 
-# Age separated by NAC status and biologic subtype! 
+
+###################################################################
+## Age separated by NAC status and biologic subtype violin plots ## 
+###################################################################
+
 fig, ax = plt.subplots(figsize=(6,4))
 
 pos = [1,2,4,5,7,8]
@@ -205,7 +329,9 @@ plt.tight_layout()
 fig.savefig(f'{dn}/plots/age_by_nac_and_biomarker.png')
 plt.close()
 
-# Year of diagnosis by NAC status and biologic subtype
+#######################################################################
+## Year Dx separated by NAC status and biologic subtype violin plots ## 
+#######################################################################
 
 fig, ax = plt.subplots(figsize=(6,4))
 
