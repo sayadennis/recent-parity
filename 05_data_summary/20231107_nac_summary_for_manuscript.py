@@ -122,7 +122,6 @@ for ix in nac_biomarker_crosstab.index:
 nac_biomarker_crosstab_pct.to_csv(f'{dn}/summary_tables/nac_by_biomarker.csv', index=True, header=True)
 
 chi2, p, dof, expected = chi2_contingency(nac_biomarker_crosstab)
-fisher_exact(nac_biomarker_crosstab)
 
 #############################
 ## Tumor size violin plots ##
@@ -229,7 +228,7 @@ for key in cts.keys():
     for i in range(len(cts[key])):
         pcts[key].append(100 * cts[key][i] / np.sum([cts[x][i] for x in cts.keys()]))
 
-fig, ax = plt.subplots(figsize=(9,3))
+fig, ax = plt.subplots(figsize=(6,3))
 pos = [1,2,3,5,6,7,9,10,11]
 
 ax.bar(
@@ -363,4 +362,51 @@ ax.legend(['No NAC', 'Had NAC'], loc='lower right')
 plt.tight_layout()
 fig.savefig(f'{dn}/plots/year_dx_by_nac_and_biomarker.png')
 plt.close()
+
+
+#####################################
+## Year Dx as a population pyramid ## 
+#####################################
+
+cts = {
+    'ER/PR+ HER2-' : {'Had NAC' : [], 'No NAC' : []}, 
+    'HER2+' : {'Had NAC' : [], 'No NAC' : []},
+    'Triple Negative' : {'Had NAC' : [], 'No NAC' : []},
+}
+
+years = np.arange(2010, 2021)
+for dx_year in years:
+    for biologic_type in cts.keys():
+        no_nac = data.iloc[(data.nat.values!=1) & (data.biomarker_subtypes.values==biologic_type) & (data.year_of_diagnosis.values==dx_year),:].shape[0]
+        had_nac = data.iloc[(data.nat.values==1) & (data.biomarker_subtypes.values==biologic_type) & (data.year_of_diagnosis.values==dx_year),:].shape[0]
+        cts[biologic_type]['Had NAC'].append(had_nac)
+        cts[biologic_type]['No NAC'].append(no_nac)
+
+fig, ax = plt.subplots(1, 3, figsize=(6,4))
+
+for i, biologic_type in enumerate(list(cts.keys())):
+    max_num = np.max(cts[biologic_type]['Had NAC'] + cts[biologic_type]['No NAC'])
+    ax[i].barh(np.arange(len(years)), cts[biologic_type]['Had NAC'], color='gold', height=1.)
+    ax[i].barh(np.arange(len(years)), -1 * np.array(cts[biologic_type]['No NAC']), color='royalblue', height=1.)
+    ax[i].set_xlim(-1.05 * max_num, 1.05 * max_num)
+    xtick_num = int(1.05 * max_num - ((1.05 * max_num) % 10))
+    ax[i].set_xticks([-1 * xtick_num, 0, xtick_num])
+    ax[i].set_xticklabels([xtick_num, 0, xtick_num])
+    ax[i].spines['top'].set_visible(False)
+    ax[i].spines['right'].set_visible(False)
+    ax[i].set_xlabel(biologic_type)
+    if i==0:
+        ax[i].set_yticks([0,5,10])
+        ax[i].set_yticklabels([2010, 2015, 2020])
+        ax[i].legend(['Had NAC', 'No NAC'], loc='lower left')
+    else:
+        ax[i].spines['left'].set_visible(False)
+        ax[i].set_yticks([])
+
+fig.suptitle('Number of patients who received NAC by diagnosis year')
+
+plt.tight_layout()
+fig.savefig(f'{dn}/plots/year_dx_by_nac_and_biomarker_horizontalbars.png')
+plt.close()
+
 
