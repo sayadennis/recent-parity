@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 from datetime import datetime
 
-dn = '/share/fsmresfiles/breast_cancer_pregnancy/data'
+dn = '/share/fsmresfiles/breast_cancer_pregnancy/data/01_ssms_raw'
 
 with open(os.path.join(dn, 'column_names_note_type_detail.txt'), 'r') as f:
     lines = f.readlines()

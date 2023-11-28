@@ -4,10 +4,10 @@ import re
 import numpy as np
 import pandas as pd
 
-sys.path.append('recent_parity/process_notes')
+sys.path.append('recent_parity/recent-parity/02_process_notes')
 import ParseNotesGenetic
 
-dn = '/share/fsmresfiles/breast_cancer_pregnancy/data/notes/genetic_counsel'
+dn = '/share/fsmresfiles/breast_cancer_pregnancy/data/02_isolated_sections/genetic'
 
 data = pd.read_csv(os.path.join(dn, 'isolated_sections_genetic_testing.csv'), sep='!')
 
