@@ -45,35 +45,49 @@ for i in struc['ir_id'].unique():
     patient_notelist = []
     # subsetyears = list(struc['created_year'].iloc[[x==i for x in struc['ir_id']]].values)
     for j in range(len(subsetlines)):
-        testsearch = re.split('Test results:', subsetlines[j], 1)
-        if len(testsearch) > 1:
-            sliced_string = re.split('Interpretation', testsearch[1], 1)[0]
+        if re.search("Test results:", subsetlines[j]):
+            sliced_string = re.split('Test results:', subsetlines[j], 1)[1]
+            sliced_string = re.split('Interpretation', sliced_string, 1)[0]
             if np.any([x in sliced_string for x in ['BRCA', 'BRCA1', 'BRCA2', 'PALB2', 'TP53', 'PTEN', 'CDH1', 'STK11', 'CHEK2', 'ATM']]):
                 texts.loc[i,'Test results:'] = sliced_string
-                ## TODO: add logic "1. Test name/genes analyzed: BRCAplus panel (ATM, BRCA1, BRCA2, CDH1, CHEK2, PALB2, PTEN, TP53)"
-        else:
-            pattern = r"GENETIC RESULT ADDENDUM    ADDENDUM: .{30,200} Test results "
-            testsearch = re.split(pattern, subsetlines[j], 1)
-            if len(testsearch) > 1:
-                sliced_string = re.split("Interpretation", testsearch[1], 1)[0]
-                if len(sliced_string) > len(texts.loc[i,'Test results:']):
-                    texts.loc[i,'Test results:'] = sliced_string
-            else:
-                testsearch = re.split("1. Genetic testing for the following genes was offered:", subsetlines[j], 1)
-                if len(testsearch) > 1:
-                    sliced_string = re.split("2. ", testsearch[1], 1)[0]
-                    if len(sliced_string) > len(texts.loc[i,'Test results:']):
-                        texts.loc[i,'Test results:'] = sliced_string
-                else:
-                    testsearch = re.split("1. Genetic testing for hereditary breast and ovarian cancer syndrome was offered", subsetlines[j], 1)
-                    if len(testsearch) > 1:
-                        sliced_string = re.split("2. ", testsearch[1], 1)[0]
-                        if ("Gene Dx for BRCA1/2 Sequencing" in sliced_string) | ("Gene Dx for BRCA1/2 NGS" in sliced_string):
-                            if len('Gene Dx for BRCA1, BRCA2') > len(texts.loc[i,'Test results:']):
-                                texts.loc[i,'Test results:'] = 'Gene Dx for BRCA1, BRCA2'
-                        elif ("GeneDx for the High Risk Breast Cancer Panel" in sliced_string):
-                            if len('GeneDx for the High Risk Breast Cancer Panel: BRCA1, BRCA2, CDH1, PTEN, STK11 and TP53?') > len(texts.loc[i,'Test results:']):
-                                texts.loc[i,'Test results:'] = 'GeneDx for the High Risk Breast Cancer Panel: BRCA1, BRCA2, CDH1, PTEN, STK11 and TP53?'
+        elif re.search(r"GENETIC RESULT ADDENDUM    ADDENDUM: .{30,200} Test results ", subsetlines[j]):
+            sliced_string = re.split(r"GENETIC RESULT ADDENDUM    ADDENDUM: .{30,200} Test results ", subsetlines[j], 1)[1]
+            sliced_string = re.split("Interpretation", testsearch[1], 1)[0]
+            if len(sliced_string) > len(texts.loc[i,'Test results:']):
+                texts.loc[i,'Test results:'] = sliced_string
+        elif re.search("1. Genetic testing for the following genes was offered:", subsetlines[j]):
+            sliced_string = re.split("1. Genetic testing for the following genes was offered:", subsetlines[j], 1)[1]
+            sliced_string = re.split("2. ", sliced_string, 1)[0]
+            if len(sliced_string) > len(texts.loc[i,'Test results:']):
+                texts.loc[i,'Test results:'] = sliced_string
+        elif re.search("1. Genetic testing for hereditary breast and ovarian cancer syndrome was offered", subsetlines[j]):
+            sliced_string = re.split("1. Genetic testing for hereditary breast and ovarian cancer syndrome was offered", subsetlines[j], 1)[1]
+            sliced_string = re.split("2. ", sliced_string, 1)[0]
+            if ("Gene Dx for BRCA1/2 Sequencing" in sliced_string) | ("Gene Dx for BRCA1/2 NGS" in sliced_string):
+                if len('Gene Dx for BRCA1, BRCA2') > len(texts.loc[i,'Test results:']):
+                    texts.loc[i,'Test results:'] = 'Gene Dx for BRCA1, BRCA2'
+            elif ("GeneDx for the High Risk Breast Cancer Panel" in sliced_string):
+                if len('GeneDx for the High Risk Breast Cancer Panel: BRCA1, BRCA2, CDH1, PTEN, STK11 and TP53?') > len(texts.loc[i,'Test results:']):
+                    texts.loc[i,'Test results:'] = 'GeneDx for the High Risk Breast Cancer Panel: BRCA1, BRCA2, CDH1, PTEN, STK11 and TP53?'
+            elif "GeneDx labs for sequencing and deletion/duplication analysis of the BRCA1 and BRCA2 genes" in sliced_string:
+                if len("GeneDx labs for sequencing and deletion/duplication analysis of the BRCA1 and BRCA2 genes") > len(texts.loc[i,'Test results:']):
+                    texts.loc[i,'Test results:'] = "GeneDx for BRCA1, BRCA2"
+            elif "Gene Dx for NGS of the BRCA genes" in sliced_string:
+                texts.loc[i,'Test results:'] = "GeneDx for BRCA1, BRCA2"
+        elif re.search(r"1\. Test name/genes analyzed: BRCAplus panel \(ATM, BRCA1, BRCA2, CDH1, CHEK2, PALB2, PTEN, TP53\)", subsetlines[j]):
+            texts.loc[i,'Test results:'] = "BRCAplus panel (ATM, BRCA1, BRCA2, CDH1, CHEK2, PALB2, PTEN, TP53)"
+        elif re.search(r"Invitae(?: Breast)? STAT Panel \(BRCA1, BRCA2, CDH1, PALB2, PTEN, STK11, TP53\)", subsetlines[j]):
+            texts.loc[i,'Test results:'] = "Invitae Breast STAT Panel (BRCA1, BRCA2, CDH1, PALB2, PTEN, STK11, TP53)"
+        elif re.search(r"1\. Test name/genes analyzed: Invitae STAT breast cancer panel \(7 genes\)", subsetlines[j]):
+            texts.loc[i,'Test results:'] = "Invitae Breast STAT Panel (BRCA1, BRCA2, CDH1, PALB2, PTEN, STK11, TP53)"
+        elif re.search(r"1\. Test name/genes analyzed: Invitae STAT add-on panel \(ATM, BRCA1, BRCA2, CDH1, CHEK2, PALB2, PTEN, STK11, TP53\)", subsetlines[j]):
+            texts.loc[i,'Test results:'] = "Invitae STAT add-on panel (ATM, BRCA1, BRCA2, CDH1, CHEK2, PALB2, PTEN, STK11, TP53)"
+        elif re.search(r"1\. Test name/genes analyzed: Invitae STAT add on panel \(9 genes total\)", subsetlines[j]):
+            texts.loc[i,'Test results:'] = "Invitae STAT add-on panel (ATM, BRCA1, BRCA2, CDH1, CHEK2, PALB2, PTEN, STK11, TP53)"
+        elif re.search(r"1. Test name/genes analyzed:", subsetlines[j]):
+            sliced_string = re.split(r"1. Test name/genes analyzed:", subsetlines[j], 1)[1]
+            sliced_string = re.split(r"2. ", sliced_string, 1)[0]
+            texts.loc[i,'Test results:'] = sliced_string
 
 genelist = ['BRCA', 'BRCA1', 'BRCA2', 'PALB2', 'TP53', 'PTEN', 'CDH1', 'STK11', 'CHEK2', 'ATM']
 

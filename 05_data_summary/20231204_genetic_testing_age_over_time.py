@@ -82,7 +82,13 @@ no_mention_genename = struc.iloc[[x in irid_wo_genenames for x in struc.ir_id.va
 
 likely_bart = no_mention_genename.iloc[['BRACAnalysis' in x for x in no_mention_genename.note_text],:].ir_id.unique()
 nobart = no_mention_genename.iloc[['BRACAnalysis' not in x for x in no_mention_genename.note_text],:].ir_id.unique()
-nobart_notes = struc.iloc[[x in nobart for x in struc.ir_id],:].note_text
+nobart_struc = struc.iloc[[x in nobart for x in struc.ir_id],:]
+
+unclear = []
+for ir_id in nobart:
+    substruc = nobart_struc.iloc[nobart_struc.ir_id.values==ir_id,:]
+    if np.any(["It is unclear what test was ordered" in x for x in substruc.note_text.values]):
+        unclear.append(ir_id)
 
 print(f'{len(likely_bart)} ({100 * (len(likely_bart))/mention.shape[0]:.1f}%) patients had mention of BRACAnalysis (BART?) in their genetic counseling notes.')
 
