@@ -52,7 +52,7 @@ for i in struc['ir_id'].unique():
                 texts.loc[i,'Test results:'] = sliced_string
         elif re.search(r"GENETIC RESULT ADDENDUM    ADDENDUM: .{30,200} Test results ", subsetlines[j]):
             sliced_string = re.split(r"GENETIC RESULT ADDENDUM    ADDENDUM: .{30,200} Test results ", subsetlines[j], 1)[1]
-            sliced_string = re.split("Interpretation", testsearch[1], 1)[0]
+            sliced_string = re.split("Interpretation", sliced_string, 1)[0]
             if len(sliced_string) > len(texts.loc[i,'Test results:']):
                 texts.loc[i,'Test results:'] = sliced_string
         elif re.search("1. Genetic testing for the following genes was offered:", subsetlines[j]):
