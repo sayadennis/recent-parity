@@ -9,10 +9,8 @@ from datetime import datetime
 
 import numpy as np
 import pandas as pd
+import recent_parity_stat
 from scipy.stats import ttest_ind
-from sklearn.linear_model import LogisticRegression
-from sklearn.preprocessing import StandardScaler
-from sklearn.utils import resample
 
 dn = "/share/fsmresfiles/breast_cancer_pregnancy"
 dout = "/share/fsmresfiles/breast_cancer_pregnancy/stat_results"
@@ -35,43 +33,7 @@ with open(f"{dn}/{datadir}/data_dictionary.p", "rb") as f:
     dd = pickle.load(f)
 
 ## Fill in parity category
-data["parity_category"] = None
-for i in data.index:
-    if data.loc[i, "parous"] == 0:
-        data.loc[i, "parity_category"] = "Nulliparous"
-    elif data.loc[i, "years_since_pregnancy"] < 5:
-        data.loc[i, "parity_category"] = "<5 years"
-    elif data.loc[i, "years_since_pregnancy"] < 10:
-        data.loc[i, "parity_category"] = "5-10 years"
-    else:
-        data.loc[i, "parity_category"] = ">=10 years"
-
-data["nulliparous"] = np.invert(data["parous"].astype(bool)).astype(float)
-data["parity <5 years"] = np.where(
-    (data["parous"] == 0) | np.isnan(data["years_since_pregnancy"]),
-    np.nan,
-    data["years_since_pregnancy"] < 5,
-)
-data["parity >=5 years"] = np.where(
-    (data["parous"] == 0) | np.isnan(data["years_since_pregnancy"]),
-    np.nan,
-    data["years_since_pregnancy"] >= 5,
-)
-data["parity <10 years"] = np.where(
-    (data["parous"] == 0) | np.isnan(data["years_since_pregnancy"]),
-    np.nan,
-    data["years_since_pregnancy"] < 10,
-)
-data["parity >=10 years"] = np.where(
-    (data["parous"] == 0) | np.isnan(data["years_since_pregnancy"]),
-    np.nan,
-    data["years_since_pregnancy"] >= 10,
-)
-data["parity 5-10 years"] = np.where(
-    (data["parous"] == 0) | np.isnan(data["years_since_pregnancy"]),
-    np.nan,
-    (data["years_since_pregnancy"] >= 5) & (data["years_since_pregnancy"] < 10),
-)
+data = recent_parity_stat.fill_in_parity_categorical(data)
 
 ## Fill in biomarker subtypes
 data["biomarker_subtypes"] = None
@@ -143,6 +105,7 @@ data["pCR"] = (
     data.response_nat.map(dd["response_nat"]["Choices, Calculations, OR Slider Labels"])
     == "No residual disease"
 ).astype(int)
+
 data["positive_response"] = (
     (
         (
@@ -159,6 +122,7 @@ data["positive_response"] = (
         ).values
     )
 ).astype(int)
+
 data["poor_response"] = (
     (
         (
@@ -175,81 +139,6 @@ data["poor_response"] = (
         ).values
     )
 ).astype(int)
-
-##########################
-#### Define functions ####
-##########################
-
-
-def generate_lrdata(df, parity_ref, parity_comp, feature_name):
-    """
-    This function takes a dataframe and
-    generates the input and target of the logistic regression model
-    based on the given parity comparison and feature name.
-    """
-    lrdata = pd.DataFrame(
-        None, index=df.index, columns=[parity_comp, feature_name, "age", "fam_hx"]
-    )
-    lrdata[feature_name] = df[feature_name].astype(float)
-    lrdata["age"] = df["age_at_diagnosis"].astype(float)
-    lrdata["fam_hx"] = df["fam_hx"].astype(float)
-    for i in df.index:
-        lrdata.loc[i, parity_comp] = (
-            0
-            if df.loc[i, parity_ref] == 1
-            else 1
-            if df.loc[i, parity_comp] == 1
-            else np.nan
-        )
-    # drop any rows with NaN
-    lrdata.dropna(inplace=True, axis=0)
-    # separate X and y
-    X = lrdata[[parity_comp, "age", "fam_hx"]]
-    y = lrdata[feature_name]
-    # standard scale age
-    scaler = StandardScaler()
-    X["age"] = scaler.fit_transform(X["age"].values.reshape(-1, 1))
-    return X, y
-
-
-def get_oddsratio_ci(X, y, alpha=0.95, rep=5000):
-    """
-    This function takes the input and target of the logistic regression
-    and returns the odds ratio, confidence intervals, and the p-value.
-    """
-    oddsratio = {}
-    for colnum in range(X.shape[1]):
-        oddsratio[colnum] = []
-    #
-    for i in range(rep):
-        X_bs, y_bs = resample(X, y, random_state=i)  # create bootstrap (bs) sample
-        if ~np.all(y_bs == 0):
-            lrm = LogisticRegression(penalty="l2", solver="lbfgs")
-            lrm.fit(X_bs, y_bs)
-            for colnum in range(X.shape[1]):
-                oddsratio[colnum].append(np.exp(lrm.coef_[0][colnum]))
-        else:
-            continue
-    mean_or = [np.mean(oddsratio[colnum]) for colnum in range(X.shape[1])]
-    ci, pvals = [], []
-    ci_lower = ((1.0 - alpha) / 2.0) * 100
-    ci_higher = (alpha + ((1.0 - alpha) / 2.0)) * 100
-    for colnum in range(X.shape[1]):
-        # first get ci1
-        lower = max(0.0, np.percentile(oddsratio[colnum], ci_lower))
-        upper = np.percentile(oddsratio[colnum], ci_higher)
-        ci.append((lower, upper))
-        pvals.append(
-            np.min(
-                [
-                    (np.array(oddsratio[colnum]) < 1).mean(),
-                    (np.array(oddsratio[colnum]) > 1).mean(),
-                ]
-            )
-            * 2
-        )
-    return mean_or, ci, pvals
-
 
 ##########################
 #### Perform Analysis ####
@@ -290,7 +179,7 @@ for parity_comparison, _ in parity_comparisons.items():
     for feature_name in feature_names:
         for stratification in stratifications:
             subdata = data.iloc[data.biomarker_subtypes.values == stratification, :]
-            X, y = generate_lrdata(
+            X, y = recent_parity_stat.generate_lrdata(
                 subdata, parity_ref=ref, parity_comp=comp, feature_name=feature_name
             )
             if (np.sum((X[comp] == 0) & (y == 1)) == 0) | (
@@ -307,7 +196,7 @@ for parity_comparison, _ in parity_comparisons.items():
                         cts = crosstab.loc[i, j]
                         pcts = 100 * cts / totals[j]
                         crosstab.loc[i, j] = f"{cts} ({pcts:.1f}%)"
-                oddsratios, cis, pvals = get_oddsratio_ci(X, y)
+                oddsratios, cis, pvals = recent_parity_stat.get_oddsratio_ci(X, y)
                 or_formatted = f"{oddsratios[0]:.2f} ({cis[0][0]:.2f}-{cis[0][1]:.2f})"
                 pval_formatted = f"{pvals[0]:.4f}"
                 results = pd.concat(
