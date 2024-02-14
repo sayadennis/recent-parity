@@ -4,6 +4,8 @@ Functions to facilitate the statistical analysis.
 
 # pylint: disable=too-many-locals
 
+from typing import Union
+
 import numpy as np
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
@@ -76,34 +78,58 @@ def fill_in_parity_categorical(data: pd.DataFrame) -> pd.DataFrame:
     return data
 
 
-def generate_lrdata(df, parity_ref, parity_comp, feature_name):
+def generate_lrdata(
+    df: pd.DataFrame,
+    parity_ref: str,
+    parity_comp: Union[str, list[str]],
+    feature_name: str,
+):
     """
     This function takes a dataframe and
     generates the input and target of the logistic regression model
     based on the given parity comparison and feature name.
     """
-    lrdata = pd.DataFrame(
-        None, index=df.index, columns=[parity_comp, feature_name, "age", "fam_hx"]
-    )
-    lrdata[feature_name] = df[feature_name].astype(float)
-    lrdata["age"] = df["age_at_diagnosis"].astype(float)
-    lrdata["fam_hx"] = df["fam_hx"].astype(float)
-    for i in df.index:
-        lrdata.loc[i, parity_comp] = (
-            0
-            if df.loc[i, parity_ref] == 1
-            else 1
-            if df.loc[i, parity_comp] == 1
-            else np.nan
+    if isinstance(parity_comp, list):
+        lrdata = pd.DataFrame(
+            None, index=df.index, columns=parity_comp + [feature_name, "age", "fam_hx"]
         )
-    # drop any rows with NaN
-    lrdata.dropna(inplace=True, axis=0)
-    # separate X and y
-    X = lrdata[[parity_comp, "age", "fam_hx"]]
-    y = lrdata[feature_name]
-    # standard scale age
-    scaler = StandardScaler()
-    X["age"] = scaler.fit_transform(X["age"].values.reshape(-1, 1))
+        lrdata[feature_name] = df[feature_name].astype(float)
+        lrdata["age"] = df["age_at_diagnosis"].astype(float)
+        lrdata["fam_hx"] = df["fam_hx"].astype(float)
+        for colname in parity_comp:
+            lrdata[colname] = df[colname].astype(float)
+            lrdata[colname].fillna(0.0, inplace=True)
+        # drop any rows with NaN
+        lrdata.dropna(inplace=True, axis=0)
+        # separate X and y
+        X = lrdata[parity_comp + ["age", "fam_hx"]]
+        y = lrdata[feature_name]
+        # standard scale age
+        scaler = StandardScaler()
+        X["age"] = scaler.fit_transform(X["age"].values.reshape(-1, 1))
+    else:
+        lrdata = pd.DataFrame(
+            None, index=df.index, columns=[parity_comp, feature_name, "age", "fam_hx"]
+        )
+        lrdata[feature_name] = df[feature_name].astype(float)
+        lrdata["age"] = df["age_at_diagnosis"].astype(float)
+        lrdata["fam_hx"] = df["fam_hx"].astype(float)
+        for i in df.index:
+            lrdata.loc[i, parity_comp] = (
+                0
+                if df.loc[i, parity_ref] == 1
+                else 1
+                if df.loc[i, parity_comp] == 1
+                else np.nan
+            )
+        # drop any rows with NaN
+        lrdata.dropna(inplace=True, axis=0)
+        # separate X and y
+        X = lrdata[[parity_comp, "age", "fam_hx"]]
+        y = lrdata[feature_name]
+        # standard scale age
+        scaler = StandardScaler()
+        X["age"] = scaler.fit_transform(X["age"].values.reshape(-1, 1))
     return X, y
 
 
@@ -112,8 +138,8 @@ def get_oddsratio_ci(X, y, alpha=0.95, rep=5000):
     This function takes the input and target of the logistic regression
     and returns the odds ratio, confidence intervals, and the p-value.
     """
-    or1, or2, or3 = [], [], []
-    i = 0
+    bootstrapped_oddsratios = [[] for _ in range(X.shape[1])]
+    # or1, or2, or3 = [], [], []
     for i in range(rep):
         X_bs, y_bs = resample(
             X, y, random_state=i, stratify=y
@@ -121,17 +147,21 @@ def get_oddsratio_ci(X, y, alpha=0.95, rep=5000):
         if ~np.all(y_bs == 0):
             lrm = LogisticRegression(penalty="l2", solver="lbfgs")
             lrm.fit(X_bs, y_bs)
-            or1.append(np.exp(lrm.coef_[0][0]))
-            or2.append(np.exp(lrm.coef_[0][1]))
-            or3.append(np.exp(lrm.coef_[0][2]))
+            for i in range(X.shape[1]):
+                bootstrapped_oddsratios[i].append(np.exp(lrm.coef_[0][i]))
+            # or1.append(np.exp(lrm.coef_[0][0]))
+            # or2.append(np.exp(lrm.coef_[0][1]))
+            # or3.append(np.exp(lrm.coef_[0][2]))
         else:
             continue
-    oddsratios = [np.mean(or1), np.mean(or2), np.mean(or3)]
+    oddsratios = [
+        np.mean(x) for x in bootstrapped_oddsratios
+    ]  # [np.mean(or1), np.mean(or2), np.mean(or3)]
     # first get ci1
     ci_lower = ((1.0 - alpha) / 2.0) * 100
     ci_higher = (alpha + ((1.0 - alpha) / 2.0)) * 100
     ci, pvals = [], []
-    for bs_sample in [or1, or2, or3]:
+    for bs_sample in bootstrapped_oddsratios:  # [or1, or2, or3]:
         lower = max(0.0, np.percentile(bs_sample, ci_lower))
         upper = np.percentile(bs_sample, ci_higher)
         ci.append((lower, upper))

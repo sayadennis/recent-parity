@@ -73,14 +73,18 @@ genes = [item for item in genes if data[item].sum(axis=0) >= 2]
 datestring = datetime.now().strftime("%Y%m%d")
 
 parity_comparisons = {
-    "Parous vs. Nulliparous": {"ref": "nulliparous", "comp": "parous"},
-    "<5 vs. >=5 years": {"ref": "parity >=5 years", "comp": "parity <5 years"},
-    "<10 vs. >=10 years": {"ref": "parity >=10 years", "comp": "parity <10 years"},
-    "<5 vs. >=10 years": {"ref": "parity >=10 years", "comp": "parity <5 years"},
+    # "Parous vs. Nulliparous": {"ref": "nulliparous", "comp": "parous"},
+    # "<5 vs. >=5 years": {"ref": "parity >=5 years", "comp": "parity <5 years"},
+    # "<10 vs. >=10 years": {"ref": "parity >=10 years", "comp": "parity <10 years"},
+    # "<5 vs. >=10 years": {"ref": "parity >=10 years", "comp": "parity <5 years"},
+    "Four level comparison": {
+        "ref": "nulliparous",
+        "comp": ["parity <5 years", "parity 5-10 years", "parity >=10 years"],
+    },
     "<5 years vs. Nulliparous": {"ref": "nulliparous", "comp": "parity <5 years"},
     "5-10 years vs. Nulliparous": {"ref": "nulliparous", "comp": "parity 5-10 years"},
-    "<10 years vs. Nulliparous": {"ref": "nulliparous", "comp": "parity <10 years"},
-    ">=5 years vs. Nulliparous": {"ref": "nulliparous", "comp": "parity >=5 years"},
+    # "<10 years vs. Nulliparous": {"ref": "nulliparous", "comp": "parity <10 years"},
+    # ">=5 years vs. Nulliparous": {"ref": "nulliparous", "comp": "parity >=5 years"},
     ">=10 years vs. Nulliparous": {"ref": "nulliparous", "comp": "parity >=10 years"},
 }
 
@@ -88,28 +92,80 @@ for parity_comparison, _ in parity_comparisons.items():
     print(f"#### {parity_comparison} ####")
     ref = parity_comparisons[parity_comparison]["ref"]
     comp = parity_comparisons[parity_comparison]["comp"]
-    results = pd.DataFrame(
-        columns=[
-            "Variable of interest",
-            "Category",
-            comp,
-            ref,
-            "OR (95% CI)",
-            "p-value",
-        ]
-    )
-    for feature_name in genes:
-        X, y = recent_parity_stat.generate_lrdata(
-            data, parity_ref=ref, parity_comp=comp, feature_name=feature_name
+    if isinstance(comp, str):
+        results = pd.DataFrame(
+            columns=[
+                "Variable of interest",
+                "Category",
+                comp,
+                ref,
+                "OR (95% CI)",
+                "p-value",
+            ]
         )
-        if (np.sum((X[comp] == 0) & (y == 1)) == 0) | (
-            np.sum((X[comp] == 1) & (y == 1)) == 0
-        ):
-            print(
-                f"# Cannot perform comparison for {feature_name} due to lack of data\n"
+        for feature_name in genes:
+            X, y = recent_parity_stat.generate_lrdata(
+                data, parity_ref=ref, parity_comp=comp, feature_name=feature_name
             )
-        else:
-            crosstab = pd.crosstab(X[comp], y)
+            if (np.sum((X[comp] == 0) & (y == 1)) == 0) | (
+                np.sum((X[comp] == 1) & (y == 1)) == 0
+            ):
+                print(
+                    f"# Cannot perform comparison for {feature_name} due to lack of data\n"
+                )
+            else:
+                crosstab = pd.crosstab(X[comp], y)
+                totals = crosstab.sum(axis=0)
+                for i in crosstab.index:
+                    for j in crosstab.columns:
+                        cts = crosstab.loc[i, j]
+                        pcts = 100 * cts / totals[j]
+                        crosstab.loc[i, j] = f"{cts} ({pcts:.1f}%)"
+                oddsratios, cis, pvals = recent_parity_stat.get_oddsratio_ci(X, y)
+                or_formatted = f"{oddsratios[0]:.2f} ({cis[0][0]:.2f}-{cis[0][1]:.2f})"
+                pval_formatted = f"{pvals[0]:.4f}"
+                results = pd.concat(
+                    (
+                        results,
+                        pd.DataFrame(
+                            {
+                                "Variable of interest": [feature_name, None],
+                                "Category": ["Yes", "No"],
+                                parity_comparisons[parity_comparison]["comp"]: [
+                                    crosstab.loc[1, 1],
+                                    crosstab.loc[1, 0],
+                                ],
+                                parity_comparisons[parity_comparison]["ref"]: [
+                                    crosstab.loc[0, 1],
+                                    crosstab.loc[0, 0],
+                                ],
+                                "OR (95% CI)": [or_formatted, None],
+                                "p-value": [pval_formatted, None],
+                            }
+                        ),
+                    )
+                )
+        fout = datestring + "_genetic_" + parity_comparison.replace(" ", "_") + ".csv"
+        results.to_csv(f"{dout}/{fout}", index=False)
+    else:  # if four level comparison
+        results = pd.DataFrame(
+            columns=["Variable of interest", "Category"]
+            + [ref]
+            + comp
+            + [f"OR {x}" for x in comp]
+            + [f"p-value {x}" for x in comp]
+        )
+        for feature_name in genes:
+            X, y = recent_parity_stat.generate_lrdata(
+                data, parity_ref=ref, parity_comp=comp, feature_name=feature_name
+            )
+            string_parcats = []  # [comp[x] for x in np.where(X[comp]==1)[1]]
+            for i in X.index:
+                if X[comp].loc[i, :].sum() == 0:
+                    string_parcats.append("nulliparous")
+                else:
+                    string_parcats.append(comp[np.where(X[comp].loc[i, :])[0][0]])
+            crosstab = pd.crosstab(pd.Series(string_parcats), y)
             totals = crosstab.sum(axis=0)
             for i in crosstab.index:
                 for j in crosstab.columns:
@@ -117,8 +173,11 @@ for parity_comparison, _ in parity_comparisons.items():
                     pcts = 100 * cts / totals[j]
                     crosstab.loc[i, j] = f"{cts} ({pcts:.1f}%)"
             oddsratios, cis, pvals = recent_parity_stat.get_oddsratio_ci(X, y)
-            or_formatted = f"{oddsratios[0]:.2f} ({cis[0][0]:.2f}-{cis[0][1]:.2f})"
-            pval_formatted = f"{pvals[0]:.4f}"
+            or_formatted = [
+                f"{oddsratios[i]:.2f} ({cis[i][0]:.2f}-{cis[i][1]:.2f})"
+                for i in range(len(comp))
+            ]
+            pval_formatted = [f"{pvals[i]:.4f}" for i in range(len(comp))]
             results = pd.concat(
                 (
                     results,
@@ -126,19 +185,24 @@ for parity_comparison, _ in parity_comparisons.items():
                         {
                             "Variable of interest": [feature_name, None],
                             "Category": ["Yes", "No"],
-                            parity_comparisons[parity_comparison]["comp"]: [
-                                crosstab.loc[1, 1],
-                                crosstab.loc[1, 0],
-                            ],
-                            parity_comparisons[parity_comparison]["ref"]: [
-                                crosstab.loc[0, 1],
-                                crosstab.loc[0, 0],
-                            ],
-                            "OR (95% CI)": [or_formatted, None],
-                            "p-value": [pval_formatted, None],
+                        }
+                        | {
+                            comp_cat: [
+                                crosstab.loc[comp_cat, 1],
+                                crosstab.loc[comp_cat, 0],
+                            ]
+                            for comp_cat in crosstab.index
+                        }
+                        | {
+                            f"OR {comp[i]}": [or_formatted[i], None]
+                            for i in range(len(comp))
+                        }
+                        | {
+                            f"p-value {comp[i]}": [pval_formatted[i], None]
+                            for i in range(len(comp))
                         }
                     ),
                 )
             )
-    fout = datestring + "_genetic_" + parity_comparison.replace(" ", "_") + ".csv"
-    results.to_csv(f"{dout}/{fout}", index=False)
+        fout = datestring + "_genetic_" + parity_comparison.replace(" ", "_") + ".csv"
+        results.to_csv(f"{dout}/{fout}", index=False)
