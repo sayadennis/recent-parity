@@ -132,7 +132,7 @@ def generate_lrdata(df, parity_ref, parity_comp, feature_name):
 def get_oddsratio_ci(X, y, alpha=0.95, rep=5000):
     """
     This function takes the input and target of the logistic regression
-    and returns the odds ratio, condifence intervals, and the p-value.
+    and returns the odds ratio, confidence intervals, and the p-value.
     """
     or1, or2, or3 = [], [], []
     i = 0
