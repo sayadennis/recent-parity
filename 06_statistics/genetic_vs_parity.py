@@ -1,6 +1,7 @@
 # pylint: disable=C0114
 # pylint: disable=W0621
 # pylint: disable=R0914
+# pylint: disable=duplicate-code
 
 import pickle
 from datetime import datetime
@@ -73,7 +74,7 @@ genes = [item for item in genes if data[item].sum(axis=0) >= 2]
 datestring = datetime.now().strftime("%Y%m%d")
 
 parity_comparisons = {
-    # "Parous vs. Nulliparous": {"ref": "nulliparous", "comp": "parous"},
+    "Parous vs. Nulliparous": {"ref": "nulliparous", "comp": "parous"},
     # "<5 vs. >=5 years": {"ref": "parity >=5 years", "comp": "parity <5 years"},
     # "<10 vs. >=10 years": {"ref": "parity >=10 years", "comp": "parity <10 years"},
     # "<5 vs. >=10 years": {"ref": "parity >=10 years", "comp": "parity <5 years"},

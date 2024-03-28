@@ -26,13 +26,15 @@ with open(f"{dn}/{datadir}/data_dictionary.p", "rb") as f:
 
 # mark family history as none for patients who are missing it
 data.fam_hx = data.fam_hx.fillna(0.0)
+data.parous = data.parous.fillna(0.0)
 
 #############################################
 #### Select necessary columns and export ####
 #############################################
 
+# Define gene names
 genes = [
-    "any_patho_mutation",
+    # "any_patho_mutation",
     "brca1",
     "brca2",
     "palb2",
@@ -44,7 +46,17 @@ genes = [
     "cdh1",
 ]
 
-subdata = data.iloc[data.parous.values == 1.0, :][
+# Map to binary encoding
+for feature_name in genes:
+    data[feature_name] = (
+        data[feature_name].map(
+            dd[feature_name]["Choices, Calculations, OR Slider Labels"]
+        )
+        == "Pathogenic"
+    ).astype(int)
+
+# select necessary columns
+subdata_parous = data.iloc[data.parous.values == 1.0, :][
     [
         "record_id",
         "age_at_diagnosis",
@@ -56,4 +68,17 @@ subdata = data.iloc[data.parous.values == 1.0, :][
     + genes
 ]
 
-subdata.to_csv("/home/srd6051/recent_parity_quest.csv", index=False)
+subdata_all = data[
+    [
+        "record_id",
+        "parous",
+        "age_at_diagnosis",
+        "year_of_diagnosis",
+        "age_at_most_recent_pregnancy",
+        "years_since_pregnancy",
+        "fam_hx",
+    ]
+    + genes
+]
+subdata_parous.to_csv("/home/srd6051/recent_parity_data_parous.csv", index=False)
+subdata_all.to_csv("/home/srd6051/recent_parity_data_all.csv", index=False)
