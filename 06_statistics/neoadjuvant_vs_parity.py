@@ -1,7 +1,6 @@
 # pylint: disable=C0114
 # pylint: disable=W0621
 # pylint: disable=R0914
-# pylint: disable=bare-except
 # pylint: disable=duplicate-code
 
 import pickle
@@ -52,7 +51,7 @@ for i in data.index:
             ]
             == "Positive"
         )
-    except:
+    except ValueError:
         er = False
         pr = False
         print("Missing ER/PR at index:", i)
@@ -64,7 +63,7 @@ for i in data.index:
             ]
             == "Positive"
         )
-    except:
+    except ValueError:
         her2 = False
         print("Missing HER2 at index:", i)
     # fill in subtypes
@@ -92,7 +91,7 @@ for i in data.index:
             ]
             == "Positive"
         )
-    except:
+    except ValueError:
         er = False
         pr = False
         print("Missing ER/PR at index:", i)
