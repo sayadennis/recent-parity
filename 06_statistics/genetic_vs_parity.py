@@ -75,18 +75,18 @@ datestring = datetime.now().strftime("%Y%m%d")
 
 parity_comparisons = {
     "Parous vs. Nulliparous": {"ref": "nulliparous", "comp": "parous"},
-    # "<5 vs. >=5 years": {"ref": "parity >=5 years", "comp": "parity <5 years"},
-    # "<10 vs. >=10 years": {"ref": "parity >=10 years", "comp": "parity <10 years"},
-    # "<5 vs. >=10 years": {"ref": "parity >=10 years", "comp": "parity <5 years"},
     "Four level comparison": {
         "ref": "nulliparous",
         "comp": ["parity <5 years", "parity 5-10 years", "parity >=10 years"],
     },
     "<5 years vs. Nulliparous": {"ref": "nulliparous", "comp": "parity <5 years"},
     "5-10 years vs. Nulliparous": {"ref": "nulliparous", "comp": "parity 5-10 years"},
+    ">=10 years vs. Nulliparous": {"ref": "nulliparous", "comp": "parity >=10 years"},
+    # "<5 vs. >=5 years": {"ref": "parity >=5 years", "comp": "parity <5 years"},
+    # "<10 vs. >=10 years": {"ref": "parity >=10 years", "comp": "parity <10 years"},
+    # "<5 vs. >=10 years": {"ref": "parity >=10 years", "comp": "parity <5 years"},
     # "<10 years vs. Nulliparous": {"ref": "nulliparous", "comp": "parity <10 years"},
     # ">=5 years vs. Nulliparous": {"ref": "nulliparous", "comp": "parity >=5 years"},
-    ">=10 years vs. Nulliparous": {"ref": "nulliparous", "comp": "parity >=10 years"},
 }
 
 for parity_comparison, _ in parity_comparisons.items():
